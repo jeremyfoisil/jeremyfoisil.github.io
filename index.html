@@ -191,7 +191,7 @@
     }
     
     // Éasing quadratique (ease-out)
-    function easeInQuad(t){ return 1 - (1 - t) * (1 - t); }
+    function easeInQuad(t){ return t * t; }
 
     // Séquence de tirage: 6 secondes, flashs qui ralentissent
     async function spinAndPick(){
@@ -268,6 +268,7 @@
   </script>
 </body>
 </html>
+
 
 
 

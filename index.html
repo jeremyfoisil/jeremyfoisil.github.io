@@ -113,16 +113,16 @@
     // --- Carte ---
     const map = L.map('map', { zoomControl: true }).setView([46.6, 2.5], 6);
     const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
-    const nimbo = L.tileLayer('https://prod-data.nimbo.earth/mapcache/tms/1.0.0/RGB042025@EPSG:3857@png/{z}/{x}/{y}.png?kermap_token=e6e457281dcfc04e237ddf362411cef518afbe0b09', { tms:true });
+    const nimbo = L.tileLayer('https://prod-data.nimbo.earth/mapcache/tms/1.0.0/2024_6_1@kermap/{z}/{x}/{-y}.png?kermap_token=6be3a8b204b54a022db8e3008192797868ec0c7bda', { tms:true });
 
     nimbo.addTo(map); // Nimbo comme fond par défaut
     L.control.layers({ 'Nimbo': nimbo, 'OSM': osm }).addTo(map);
 
     const baseStyle = {
-      color: '#1f2937', // contour
+      color: '#e9eef2', // contour
       weight: 1,
       fillColor: '#0e172a',
-      fillOpacity: 0.75
+      fillOpacity: 0.55
     };
     const hoverStyle = { weight: 2, color: '#93c5fd' };
     const flashStyle = { fillColor: randomHexColor(), fillOpacity: 0.95 };
@@ -270,9 +270,3 @@
   </script>
 </body>
 </html>
-
-
-
-
-
-

@@ -1,0 +1,52 @@
+name: Deploy to GitHub Pages
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # (Optionnel) Installe Node si tu as un build (vite/webpack). Sinon, supprime ce bloc.
+      # - name: Setup Node
+      #   uses: actions/setup-node@v4
+      #   with:
+      #     node-version: 20
+
+      # Remplace le placeholder dans tous les fichiers pertinents
+      - name: Inject KERMAP token
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s globstar nullglob
+          files=(index.html **/*.html **/*.js)
+          for f in "${files[@]}"; do
+            # Remplace seulement si le fichier contient le placeholder
+            if grep -q "<YOUR_API_KEY>" "$f"; then
+              sed -i "s|<YOUR_API_KEY>|${{ secrets.KERMAP_TOKEN }}|g" "$f"
+            fi
+          done
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Deploy to Pages
+        uses: actions/deploy-pages@v4

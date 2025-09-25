@@ -191,7 +191,7 @@
     }
     
     // Éasing quadratique (ease-out)
-    function easeInQuad(t){ return t * t; }
+    function easeOutQuad(t){ return 1 - (1 - t) * (1 - t); }
 
     // Séquence de tirage: 6 secondes, flashs qui ralentissent
     async function spinAndPick(){
@@ -206,7 +206,7 @@
       const times = [];
       for(let i=0;i<steps;i++){
         const t = (i+1)/steps; // 0..1
-        times.push(Math.round(easeInQuad(t)*duration));
+        times.push(Math.round(easeOutQuad(t)*duration));
       }
       // Normalise en deltas
       const deltas = [times[0]];
@@ -268,5 +268,6 @@
   </script>
 </body>
 </html>
+
 
 

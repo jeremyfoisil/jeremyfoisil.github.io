@@ -113,7 +113,7 @@
     // --- Carte ---
     const map = L.map('map', { zoomControl: true }).setView([46.6, 2.5], 6);
     const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
-    const nimbo = L.tileLayer('https://prod-data.nimbo.earth/mapcache/tms/1.0.0/2024_6_1@kermap/{z}/{x}/{-y}.png?kermap_token=6be3a8b204b54a022db8e3008192797868ec0c7bda', { tms:true });
+    const nimbo = L.tileLayer('https://prod-data.nimbo.earth/mapcache/tms/1.0.0/2024_6_1@kermap/{z}/{x}/{-y}.png?kermap_token=<YOUR_API_KEY>', { tms:true });
 
     nimbo.addTo(map); // Nimbo comme fond par défaut
     L.control.layers({ 'Nimbo': nimbo, 'OSM': osm }).addTo(map);
@@ -270,3 +270,4 @@
   </script>
 </body>
 </html>
+

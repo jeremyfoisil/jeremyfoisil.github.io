@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tirage aléatoire des départements (6s)</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <style>
+    :root{
+      --bg:#0b1020; /* fond sombre élégant */
+      --panel:#111827; /* slate-900 */
+      --panel-2:#1f2937; /* slate-800 */
+      --text:#e5e7eb; /* slate-200 */
+      --muted:#9ca3af; /* slate-400 */
+      --green:#22c55e; /* emerald-500 */
+      --green-dark:#16a34a; /* emerald-600 */
+      --accent:#60a5fa; /* blue-400 */
+      --danger:#ef4444; /* red-500 */
+      --drawn:#6b7280; /* slate-500 */
+      --border:#374151; /* slate-700 */
+    }
+    html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji"; }
+    #app { position: relative; height: 100%; }
+    #map { position:absolute; inset:0; }
+
+    /* Panneau de contrôle */
+    .controls {
+      position: absolute; top: 16px; left: 16px; z-index: 1000;
+      display: flex; flex-direction: column; gap: 12px;
+      width: 320px; max-width: calc(100vw - 32px);
+    }
+    .card { background: linear-gradient(180deg, var(--panel), var(--panel-2)); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); overflow: hidden; }
+    .card h2 { margin: 0; padding: 14px 16px; font-size: 16px; letter-spacing: .3px; background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--border); color: #fff; display:flex; align-items:center; gap:8px; }
+    .card h2 .dot{ width:10px;height:10px;border-radius:999px;background:var(--accent); box-shadow:0 0 10px var(--accent); }
+    .card .content { padding: 12px; }
+
+    .btn-row { display: flex; gap: 8px; }
+    button { 
+      appearance: none; border: 1px solid var(--border); color: #fff; background: #0b1222; 
+      padding: 10px 12px; border-radius: 12px; cursor: pointer; font-weight: 600; letter-spacing:.2px;
+      transition: transform .08s ease, background .2s ease, border-color .2s ease; flex: 1 1 auto;
+    }
+    button:hover { transform: translateY(-1px); background: #0f172a; }
+    button:active { transform: translateY(0); }
+    button[disabled]{ opacity:.6; cursor: not-allowed; }
+    .btn-primary{ background: linear-gradient(180deg, var(--green), var(--green-dark)); border-color: rgba(0,0,0,.2); }
+    .btn-primary:hover{ filter: brightness(1.05); }
+    .btn-reset{ background: linear-gradient(180deg, #f87171, var(--danger)); }
+
+    .picked-list { display: grid; grid-template-columns: 1fr; gap: 6px; max-height: 220px; overflow: auto; }
+    .pill { display:flex; align-items:center; justify-content:space-between; gap:8px; background: #0c1426; border:1px solid var(--border); padding: 8px 10px; border-radius: 10px; font-size: 13px; }
+    .pill .code { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+    .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+    /* Leaflet overrides for dark theme */
+    .leaflet-control-zoom a { background:#0b1222; border-color: var(--border); color:#fff; }
+    .leaflet-control-zoom a:hover { background:#0f172a; }
+    .leaflet-container { background: #0b0f1a; }
+
+    /* Effet de sélection finale */
+    @keyframes pulse {
+      0% { filter: drop-shadow(0 0 0 rgba(34,197,94,0)); }
+      50% { filter: drop-shadow(0 0 10px rgba(34,197,94,.8)); }
+      100% { filter: drop-shadow(0 0 0 rgba(34,197,94,0)); }
+    }
+    .final-pulse { animation: pulse 1.2s ease-in-out -3; }
+
+    /* petite fenêtre sous le bouton (la carte) */
+    .stack { display:flex; flex-direction:column; gap: 12px; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="map"></div>
+
+    <div class="controls">
+      <div class="card">
+        <h2><span class="dot"></span> Tirage aléatoire des départements</h2>
+        <div class="content stack">
+          <div class="btn-row">
+            <button id="drawBtn" class="btn-primary">🎲 Lancer le tirage (6 s)</button>
+            <button id="resetBtn" class="btn-reset">↺ Reset</button>
+          </div>
+          <div id="status" class="hint">Prêt.</div>
+          <div class="card" style="margin-top:6px;">
+            <h2 style="font-size:14px;">Départements déjà tirés</h2>
+            <div class="content">
+              <div id="picked" class="picked-list" aria-live="polite"></div>
+              <div class="hint">Ces départements seront exclus des tirages suivants.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script>
+  (function(){
+    const GEOJSON_URL = "https://france-geojson.gregoiredavid.fr/repo/departements.geojson"; // propriétés: code, nom
+
+    // --- État ---
+    const state = {
+      layersByCode: new Map(),
+      features: [],
+      drawnCodes: new Set(JSON.parse(localStorage.getItem('drawnCodes')||'[]')), // persistant
+      flashingLayer: null,
+      finalLayer: null,
+      spinning: false,
+    };
+
+    // --- Carte ---
+    const map = L.map('map', { zoomControl: true }).setView([46.6, 2.5], 6);
+    const tiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; contributeurs <a href="https://www.openstreetmap.org/">OSM</a>'
+    }).addTo(map);
+
+    const baseStyle = {
+      color: '#1f2937', // contour
+      weight: 1,
+      fillColor: '#0e172a',
+      fillOpacity: 0.75
+    };
+    const hoverStyle = { weight: 2, color: '#93c5fd' };
+    const flashStyle = { fillColor: '#22c55e', fillOpacity: 0.95 };
+    const drawnStyle = { fillColor: '#6b7280', fillOpacity: 0.5 };
+    const finalStyle = { fillColor: '#22c55e', fillOpacity: 0.95 };
+
+    // --- UI ---
+    const drawBtn = document.getElementById('drawBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const pickedEl = document.getElementById('picked');
+    const statusEl = document.getElementById('status');
+
+    function setStatus(text){ statusEl.textContent = text; }
+
+    function saveDrawn(){ localStorage.setItem('drawnCodes', JSON.stringify([...state.drawnCodes])); }
+
+    function renderPicked(){
+      const items = [...state.drawnCodes].map(code => {
+        const f = state.features.find(ft => ft.properties.code === code);
+        const name = f ? f.properties.nom : code;
+        return `<div class="pill"><span>${name}</span><span class="code">${code}</span></div>`;
+      });
+      pickedEl.innerHTML = items.join('') || '<div class="hint">Aucun pour l\'instant.</div>';
+    }
+
+    function styleFor(layer){
+      const code = layer.feature.properties.code;
+      if(state.drawnCodes.has(code)) return { ...baseStyle, ...drawnStyle };
+      return baseStyle;
+    }
+
+    function applyStyles(){
+      state.layersByCode.forEach(layer => layer.setStyle(styleFor(layer)));
+    }
+
+    function clearFlash(){
+      if(state.flashingLayer){ state.flashingLayer.setStyle(styleFor(state.flashingLayer)); state.flashingLayer = null; }
+    }
+
+    function clearFinalPulse(){
+      if(state.finalLayer){ const el = state.finalLayer.getElement(); if(el) el.classList.remove('final-pulse'); }
+    }
+
+    function setFinal(layer){
+      clearFlash(); clearFinalPulse();
+      state.finalLayer = layer; layer.setStyle({ ...baseStyle, ...finalStyle });
+      const el = layer.getElement(); if(el){ el.classList.add('final-pulse'); }
+    }
+
+    function availableCodes(){
+      return state.features.map(f => f.properties.code).filter(c => !state.drawnCodes.has(c));
+    }
+
+    function pickRandom(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+    function layerByCode(code){ return state.layersByCode.get(code); }
+
+    function flashLayer(layer){
+      if(!layer) return; clearFlash();
+      state.flashingLayer = layer; layer.setStyle({ ...baseStyle, ...flashStyle });
+    }
+
+    function randomHexColor() {
+  return "#" + Math.floor(Math.random() * 0xffffff)
+    .toString(16)
+    .padStart(6, "0")
+    .toUpperCase();
+    }
+    
+    // Éasing quadratique (ease-out)
+    function easeOutQuad(t){ return 1 - (1 - t) * (1 - t); }
+
+    // Séquence de tirage: 6 secondes, flashs qui ralentissent
+    async function spinAndPick(){
+      if(state.spinning) return;
+      const avail = availableCodes();
+      if(avail.length === 0){ setStatus('Tous les départements ont été tirés. Utilisez Reset pour recommencer.'); return; }
+
+      state.spinning = true; drawBtn.disabled = true; resetBtn.disabled = true; setStatus('Tirage en cours…');
+
+      const duration = 6000; // ms
+      const steps = Math.min(40, Math.max(18, Math.floor(avail.length * 0.6))); // nombre de flashs
+      const times = [];
+      for(let i=0;i<steps;i++){
+        const t = (i+1)/steps; // 0..1
+        times.push(Math.round(easeOutQuad(t)*duration));
+      }
+      // Normalise en deltas
+      const deltas = [times[0]];
+      for(let i=1;i<times.length;i++) deltas.push(times[i]-times[i-1]);
+
+      // Boucle de flash
+      let elapsed = 0;
+      for(let i=0;i<steps;i++){
+        await new Promise(res => setTimeout(res, deltas[i]));
+        elapsed += deltas[i];
+        const code = pickRandom(avail);
+        const layer = layerByCode(code);
+        flashLayer(layer);
+      }
+
+      // Sélection finale parmi les disponibles (peut être identique au dernier flash, peu importe)
+      const finalCode = pickRandom(avail);
+      const finalLayer = layerByCode(finalCode);
+      setFinal(finalLayer);
+      state.drawnCodes.add(finalCode);
+      saveDrawn();
+      renderPicked();
+      applyStyles();
+
+      setStatus(`Tirage terminé → ${finalLayer.feature.properties.nom} (${finalCode})`);
+      state.spinning = false; drawBtn.disabled = false; resetBtn.disabled = false;
+    }
+
+    drawBtn.addEventListener('click', spinAndPick);
+    resetBtn.addEventListener('click', () => {
+      if(state.spinning) return;
+      state.drawnCodes.clear(); saveDrawn(); renderPicked(); applyStyles(); clearFlash(); clearFinalPulse(); setStatus('Réinitialisé. Prêt.');
+    });
+
+    // Charger le GeoJSON
+    fetch(GEOJSON_URL).then(r => r.json()).then(geo => {
+      state.features = geo.features;
+      const layer = L.geoJSON(geo, {
+        style: (feature) => baseStyle,
+        onEachFeature: (feature, lyr) => {
+          const code = feature.properties.code;
+          state.layersByCode.set(code, lyr);
+          lyr.bindTooltip(`${feature.properties.nom} (${code})`, { sticky: true });
+          lyr.on('mouseover', () => { if(!state.spinning) lyr.setStyle({ ...styleFor(lyr), ...hoverStyle }); });
+          lyr.on('mouseout', () => { if(!state.spinning) lyr.setStyle(styleFor(lyr)); });
+        }
+      }).addTo(map);
+      map.fitBounds(layer.getBounds(), { padding: [20, 20] });
+
+      // Appliquer l\'état initial
+      renderPicked();
+      applyStyles();
+      setStatus('Carte chargée.');
+    }).catch(err => {
+      console.error(err);
+      setStatus('Erreur de chargement de la carte. Vérifiez votre connexion.');
+    });
+  })();
+  </script>
+</body>
+</html>

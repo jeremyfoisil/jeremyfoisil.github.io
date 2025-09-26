@@ -131,7 +131,7 @@
         month.id = 'monthSelect';
         const months = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Août','Sep','Oct','Nov','Déc'];
         months.forEach((m, i) => { const opt = document.createElement('option'); opt.value = (i+1); opt.textContent = m; month.appendChild(opt); });
-        month.value = String(new Date().getMonth() + 1);
+        month.value = String(new Date().getMonth() - 1);
         Object.assign(month.style, { background:'#0b1222', color:'#fff', border:'1px solid #374151', borderRadius:'6px', padding:'6px 8px', fontWeight:'700' });
         month.setAttribute('aria-label','Mois');
 
@@ -246,3 +246,4 @@
   </script>
 </body>
 </html>
+

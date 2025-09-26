@@ -92,9 +92,10 @@
     };
 
     // --- Carte ---
-    const map = L.map('map', { zoomControl: true }).setView([46.6, 2.5], 6);
+    const map = L.map('map', { zoomControl: false }).setView([46.6, 2.5], 6);
     const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
     const layerControl = L.control.layers({}, {}, { position:'topright' }).addTo(map);
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
     layerControl.addBaseLayer(osm, 'OSM');
 
     // === Contrôle Leaflet custom pour sélectionner Année/Mois ===

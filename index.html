@@ -167,7 +167,7 @@
       //);
       nimboLayer = L.tileLayer(
         // couche au choix : remplace <LAYER> par le nom exact (ex: basemap, orthophoto, etc.)
-        'https://<ton-site>.netlify.app/tiles/<LAYER>/{z}/{x}/{y}.png',
+        'https://proxybingo.netlify.app/tiles/${layerName}/{z}/{x}/{y}.png',
         { tms: true, maxZoom: 19, attribution: '© Kermap / Nimbo' }
       );
       nimboLayer.addTo(map);
@@ -252,5 +252,6 @@
   </script>
 </body>
 </html>
+
 
 

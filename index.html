@@ -154,26 +154,38 @@
     // === Nimbo dynamique ===
     let nimboLayer = null;
     function monthName(n){ return [,'Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'][Number(n)] || String(n); }
-    function updateNimboLayer(){
-      const year = document.getElementById('yearSelect').value;
-      const month = document.getElementById('monthSelect').value;
-      const version = 1; // adapte si tu as plusieurs versions mensuelles
-      const layerName = `${year}_${month}_${version}@kermap`;
-
-      if(nimboLayer){ map.removeLayer(nimboLayer); try{ layerControl.removeLayer(nimboLayer); }catch(e){} }
-      //nimboLayer = L.tileLayer(
-      //  `https://prod-data.nimbo.earth/mapcache/tms/1.0.0/${layerName}/{z}/{x}/{-y}.png?kermap_token=${apiKey}`,
-      //  { tms:true, tileSize:256, maxZoom:19, attribution: '© Kermap / Nimbo · Données © contributeurs' }
-      //);
-      nimboLayer = L.tileLayer(
-        // couche au choix : remplace <LAYER> par le nom exact (ex: basemap, orthophoto, etc.)
-        `https://proxybingo.netlify.app/tiles/${layerName}/{z}/{x}/{y}.png`,
-        { tms: true, maxZoom: 19, attribution: '© Kermap / Nimbo' }
-      );
-      nimboLayer.addTo(map);
-      
-      layerControl.addBaseLayer(nimboLayer, `Nimbo ${monthName(month)} ${year}`);
+   function updateNimboLayer(){
+    const year = document.getElementById('yearSelect').value;
+    const month = document.getElementById('monthSelect').value;
+    const version = 1;
+  
+    // Si la couche attend un mois sur 2 chiffres, décommente la ligne suivante
+    // const mm = String(month).padStart(2, '0');
+    // const layerName = `${year}_${mm}_${version}@kermap`;
+    const layerName = `${year}_${month}_${version}@kermap`;
+  
+    if (nimboLayer) {
+      map.removeLayer(nimboLayer);
+      try { layerControl.removeLayer(nimboLayer); } catch(e){}
     }
+  
+    nimboLayer = L.tileLayer(
+      `https://proxybingo.netlify.app/tiles/${layerName}/{z}/{x}/{y}.png`,
+      { tms: true, maxZoom: 19, attribution: '© Kermap / Nimbo' }
+    );
+    nimboLayer.addTo(map);
+    layerControl.addBaseLayer(nimboLayer, `Nimbo ${monthName(month)} ${year}`);
+    }
+    
+    // Au moment de créer le select "month", choisis une valeur valide :
+    const m0 = new Date().getMonth();           // 0..11
+    const prev = ((m0 + 11) % 12) + 1;          // 1..12 (mois précédent)
+    month.value = String(prev);
+
+    //nimboLayer = L.tileLayer(
+    //  `https://prod-data.nimbo.earth/mapcache/tms/1.0.0/${layerName}/{z}/{x}/{-y}.png?kermap_token=${apiKey}`,
+    //  { tms:true, tileSize:256, maxZoom:19, attribution: '© Kermap / Nimbo · Données © contributeurs' }
+    //);
 
     // Initialise Nimbo une première fois (après création du contrôle)
     updateNimboLayer();
@@ -252,6 +264,7 @@
   </script>
 </body>
 </html>
+
 
 
 

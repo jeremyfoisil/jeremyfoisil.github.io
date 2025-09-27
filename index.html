@@ -170,10 +170,10 @@
     }
   
     nimboLayer = L.tileLayer(
-      `https://proxybingo.netlify.app/tiles/2025_6_1@kermap/{z}/{x}/{y}.png`,
-      { tms: true, maxZoom: 19, attribution: '© Kermap / Nimbo' }
+      `https://prod-data.nimbo.earth/mapcache/tms/1.0.0/${layerName}/{z}/{x}/{-y}.png?kermap_token=${apiKey}`,
+      { tms:true, tileSize:256, maxZoom:19, attribution: '© Kermap / Nimbo · Données © contributeurs' }
     );
-    nimboLayer.addTo(map);
+
     layerControl.addBaseLayer(nimboLayer, `Nimbo ${monthName(month)} ${year}`);
     }
     
@@ -264,6 +264,7 @@
   </script>
 </body>
 </html>
+
 
 
 

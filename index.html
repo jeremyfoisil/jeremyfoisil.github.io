@@ -161,11 +161,17 @@
       const layerName = `${year}_${month}_${version}@kermap`;
 
       if(nimboLayer){ map.removeLayer(nimboLayer); try{ layerControl.removeLayer(nimboLayer); }catch(e){} }
+      //nimboLayer = L.tileLayer(
+      //  `https://prod-data.nimbo.earth/mapcache/tms/1.0.0/${layerName}/{z}/{x}/{-y}.png?kermap_token=${apiKey}`,
+      //  { tms:true, tileSize:256, maxZoom:19, attribution: '© Kermap / Nimbo · Données © contributeurs' }
+      //);
       nimboLayer = L.tileLayer(
-        `https://prod-data.nimbo.earth/mapcache/tms/1.0.0/${layerName}/{z}/{x}/{-y}.png?kermap_token=${apiKey}`,
-        { tms:true, tileSize:256, maxZoom:19, attribution: '© Kermap / Nimbo · Données © contributeurs' }
+        // couche au choix : remplace <LAYER> par le nom exact (ex: basemap, orthophoto, etc.)
+        'https://<ton-site>.netlify.app/tiles/<LAYER>/{z}/{x}/{y}.png',
+        { tms: true, maxZoom: 19, attribution: '© Kermap / Nimbo' }
       );
       nimboLayer.addTo(map);
+      
       layerControl.addBaseLayer(nimboLayer, `Nimbo ${monthName(month)} ${year}`);
     }
 
@@ -246,4 +252,5 @@
   </script>
 </body>
 </html>
+
 

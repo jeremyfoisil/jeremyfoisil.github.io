@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Accès</title>
+  <style>
+    body{font-family:system-ui,Arial,sans-serif;display:flex;min-height:100dvh;align-items:center;justify-content:center;background:#f7f7f7}
+    form{background:#fff;padding:24px 28px;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,.08);min-width:320px}
+    input,button{width:100%;padding:10px 12px;border-radius:8px;border:1px solid #ddd;font-size:16px}
+    button{margin-top:12px;border:0;background:#111;color:#fff;cursor:pointer}
+    .err{color:#b00020;margin-top:8px;display:none}
+  </style>
+</head>
+<body>
+  <form id="gate">
+    <h2>Entrer le mot de passe</h2>
+    <input id="pw" type="password" placeholder="Mot de passe" autocomplete="current-password" />
+    <button type="submit">Entrer</button>
+    <div class="err" id="err">Mot de passe incorrect.</div>
+  </form>
+
+  <script>
+    // 1) Mets ici le hash SHA-256 de TON mot de passe
+    const HASH_EXPECTED = "0ac4ca19d61cc66751f929bbeef53c28bf65bee13b75d1a1d0d669ca9479d2c4"; // <-- remplace
+
+    // 2) Si tu as renommé ta page en home.html :
+    const DEST = "home.html"; // ou "site/" si tu as mis ton site dans /site
+
+    async function sha256(text){
+      const enc = new TextEncoder().encode(text);
+      const buf = await crypto.subtle.digest("SHA-256", enc);
+      return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+    }
+
+    // Si déjà “connecté” dans cette session, on passe directement
+    if (sessionStorage.getItem("gate-ok") === "1") location.replace(DEST);
+
+    document.getElementById("gate").addEventListener("submit", async (e)=>{
+      e.preventDefault();
+      const v = document.getElementById("pw").value;
+      const h = await sha256(v);
+      if (h === HASH_EXPECTED){
+        sessionStorage.setItem("gate-ok","1");
+        location.replace(DEST);
+      } else {
+        document.getElementById("err").style.display = "block";
+      }
+    });
+  </script>
+</body>
+</html>

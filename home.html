@@ -45,8 +45,21 @@
     .btn-primary:hover{ filter: brightness(1.05); }
     .btn-reset{ background: linear-gradient(180deg, #f87171, var(--danger)); }
 
-    .picked-list { display: grid; grid-template-columns: 1fr; gap: 6px; max-height: 220px; overflow: auto; }
-    .pill { display:flex; align-items:center; justify-content:space-between; gap:8px; background: #0c1426; border:1px solid var(--border); padding: 8px 10px; border-radius: 10px; font-size: 13px; }
+    /* ===== Liste compacte 2 colonnes (pas de scroll) ===== */
+    .picked-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr)); /* 2 colonnes */
+      gap: 6px;
+      max-height: none;   /* pas de limite de hauteur -> pas de scroll */
+      overflow: visible;
+    }
+    .pill {
+      display:flex; align-items:center; justify-content:space-between; gap:8px;
+      background:#0c1426; border:1px solid var(--border);
+      padding:6px 8px;           /* plus compact */
+      border-radius:10px;
+      font-size:12px;            /* plus petit */
+    }
     .pill .code { color: var(--muted); font-variant-numeric: tabular-nums; }
 
     .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
@@ -81,7 +94,7 @@
         </div>
       </div>
       <div class="card">
-        <h2 style="font-size:14px;">Départements déjà tirés</h2>
+        <h2 id="pickedTitle" style="font-size:14px;">Départements déjà tirés</h2>
         <div class="content">
           <div id="picked" class="picked-list" aria-live="polite"></div>
           <div class="hint">Ces départements seront exclus des tirages suivants.</div>
@@ -95,6 +108,9 @@
   (function(){
     const GEOJSON_URL = "https://france-geojson.gregoiredavid.fr/repo/departements.geojson"; // propriétés: code, nom
     const apiKey = '<YOUR_API_KEY>'; // remplacé au déploiement (Option A)
+
+    // ===== Limite max de tirages =====
+    const MAX_DRAWS = 8;
 
     // --- État ---
     const state = {
@@ -202,13 +218,28 @@
 
     function setStatus(text){ statusEl.textContent = text; }
     function saveDrawn(){ localStorage.setItem('drawnCodes', JSON.stringify([...state.drawnCodes])); }
+
+    // ===== Rendu + compteur x/8 =====
     function renderPicked(){
-      const items = [...state.drawnCodes].map(code => {
+      const arr = [...state.drawnCodes];
+      const items = arr.map(code => {
         const f = state.features.find(ft => ft.properties.code === code);
         const name = f ? f.properties.nom : code;
         return `<div class="pill"><span>${name}</span><span class="code">${code}</span></div>`;
       });
       pickedEl.innerHTML = items.join('') || '<div class="hint">Aucun pour l\'instant.</div>';
+
+      const title = document.getElementById('pickedTitle');
+      if (title) title.textContent = `Départements déjà tirés (${arr.length}/${MAX_DRAWS})`;
+    }
+
+    function updateDrawButtonState() {
+      if (state.drawnCodes.size >= MAX_DRAWS) {
+        drawBtn.disabled = true;
+        setStatus(`Limite atteinte : ${MAX_DRAWS} tirages. Cliquez sur Reset pour recommencer.`);
+      } else {
+        drawBtn.disabled = false;
+      }
     }
 
     function styleFor(layer){ const code = layer.feature.properties.code; return state.drawnCodes.has(code) ? { ...baseStyle, ...drawnStyle } : baseStyle; }
@@ -225,6 +256,13 @@
 
     async function spinAndPick(){
       if(state.spinning) return;
+
+      // ===== Bloque si on a atteint la limite =====
+      if (state.drawnCodes.size >= MAX_DRAWS) {
+        updateDrawButtonState();
+        return;
+      }
+
       const avail = availableCodes();
       if(avail.length === 0){ setStatus('Tous les départements ont été tirés. Utilisez Reset pour recommencer.'); return; }
       state.spinning = true; drawBtn.disabled = true; resetBtn.disabled = true; setStatus('Tirage en cours…');
@@ -233,13 +271,30 @@
       const deltas = [times[0]]; for(let i=1;i<times.length;i++) deltas.push(times[i]-times[i-1]);
       for(let i=0;i<steps;i++){ await new Promise(res => setTimeout(res, deltas[i])); const code=pickRandom(avail); flashLayer(layerByCode(code)); }
       const finalCode = pickRandom(avail); const finalLayer = layerByCode(finalCode);
-      setFinal(finalLayer); state.drawnCodes.add(finalCode); saveDrawn(); renderPicked(); applyStyles();
+      setFinal(finalLayer);
+      state.drawnCodes.add(finalCode);
+      saveDrawn();
+      renderPicked();
+      applyStyles();
+      updateDrawButtonState(); // ===== met à jour l'état du bouton
+
       setStatus(`Tirage terminé → ${finalLayer.feature.properties.nom} (${finalCode})`);
       state.spinning = false; drawBtn.disabled = false; resetBtn.disabled = false;
+      updateDrawButtonState(); // si on vient d'atteindre la limite, garde le bouton désactivé
     }
 
     drawBtn.addEventListener('click', spinAndPick);
-    resetBtn.addEventListener('click', () => { if(state.spinning) return; state.drawnCodes.clear(); saveDrawn(); renderPicked(); applyStyles(); clearFlash(); clearFinalPulse(); setStatus('Réinitialisé. Prêt.'); });
+    resetBtn.addEventListener('click', () => {
+      if(state.spinning) return;
+      state.drawnCodes.clear();
+      saveDrawn();
+      renderPicked();
+      applyStyles();
+      clearFlash();
+      clearFinalPulse();
+      updateDrawButtonState();  // ===== réactive le bouton
+      setStatus('Réinitialisé. Prêt.');
+    });
 
     // Charger le GeoJSON
     fetch(GEOJSON_URL).then(r => r.json()).then(geo => {
@@ -255,10 +310,12 @@
         }
       }).addTo(map);
       map.fitBounds(layer.getBounds(), { padding: [20, 20] });
-      renderPicked(); applyStyles(); setStatus('Carte chargée.');
+      renderPicked();
+      applyStyles();
+      updateDrawButtonState(); // ===== au chargement
+      setStatus('Carte chargée.');
     }).catch(err => { console.error(err); setStatus('Erreur de chargement de la carte. Vérifiez votre connexion.'); });
   })();
   </script>
 </body>
 </html>
-

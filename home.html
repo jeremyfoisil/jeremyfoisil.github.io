@@ -298,7 +298,7 @@
 
     // Charger le GeoJSON
     fetch(GEOJSON_URL).then(r => r.json()).then(geo => {
-      state.features = geo.features;
+      state.features = geo.features.filter(ft => ft.properties.code !== "75");
       const layer = L.geoJSON(geo, {
         style: () => baseStyle,
         onEachFeature: (feature, lyr) => {
@@ -319,3 +319,4 @@
   </script>
 </body>
 </html>
+

@@ -3,6 +3,21 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script>
+    // Si l'utilisateur n'est pas passé par la porte d'entrée, on renvoie vers la page de login
+    try {
+      if (sessionStorage.getItem('gate-ok') !== '1') {
+        window.location.replace('/');
+      }
+    } catch (e) {
+      // Si sessionStorage est indisponible, mieux vaut refuser l'accès
+      window.location.replace('/');
+    }
+  </script>
+  <noscript>
+    <!-- Si JS est désactivé, on bloque aussi -->
+    <meta http-equiv="refresh" content="0; url=/" />
+  </noscript>
   <title>Tirage départements + Nimbo (sélecteur mois/année en contrôle Leaflet)</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
   <style>
@@ -246,3 +261,4 @@
   </script>
 </body>
 </html>
+

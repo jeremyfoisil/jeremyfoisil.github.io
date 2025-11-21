@@ -325,8 +325,168 @@
     }).catch(err => { console.error(err); setStatus('Erreur de chargement de la carte. Vérifiez votre connexion.'); });
   })();
   </script>
+  :root{
+  @import url('https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&display=swap');
+
+    .n8n-chat,
+    .n8n-chat * {
+      font-family: 'Ubuntu', sans-serif !important;
+    }
+    
+    /* === Fenêtre globale façon "nocodecreative" === */
+    .n8n-chat {
+      --chat--color-primary: #51b1ff;  
+      --chat--color-white: #ffffff;
+      --chat--color-secondary: #0b4380;             /* même couleur pour la bulle user */
+      --chat--color-third: #acb1b5;
+      --chat--body--background: #f7f7fb;  /* fond gris très clair */
+      --chat--footer--background: #ffffff;
+      
+      --chat--font-family: 'Ubuntu', sans-serif;;
+      --chat--window--width: 360px;
+      --chat--window--height: 600px;
+      --chat--window--border-radius: 12px;
+      --chat--border-radius: 10px;                  /* bulles bien arrondies */
+      --chat--header--icon: url("https://maps.nimbo.earth/assets/logo-nimbo-reverse-bfa0248e.svg");
+    }
+    
+    /* header blanc, propre */
+    .n8n-chat .chat-header {
+      background: var(--chat--color-white);
+      border-bottom: 1px solid #eee;
+      padding: 0.75rem 1rem;
+    }
+    
+    /* ligne logo + titre */
+    .n8n-chat .chat-header .chat-heading {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    /* icône avant le titre */
+    .n8n-chat .chat-header .chat-heading::before {
+      content: "";
+      width: 166px;
+      height:80px;
+      background-image: var(--chat--header--icon);
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: center;
+      flex-shrink: 0;
+    }
+    
+    /* titre sobre */
+    .n8n-chat .chat-header h1 {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+    
+    /* supprime le titre */
+    .n8n-chat .chat-header h1 {
+      display: none;
+    }
+    
+    /* supprime le sous-titre */
+    .n8n-chat .chat-header p {
+      display: none;
+    }
+    
+    /* === LISTE DES MESSAGES === */
+    .n8n-chat .chat-body {
+      background: #f7f7fb;
+    }
+    
+    /* bulles en général */
+    .n8n-chat .chat-message {
+      max-width: 60%;
+      margin-bottom: 0.6rem;
+      border-radius: 12px;
+      padding: 0.6rem 0.9rem;
+      font-size: 0.95rem;
+    }
+    
+    /* message du BOT : blanc, légère ombre, aligné à gauche */
+    .n8n-chat .chat-message-from-bot {
+      background: var(--chat--color-white);
+      color: #222;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+      margin-left: 0.5rem;
+    }
+    
+    /* message de l’USER : violet, texte blanc, aligné à droite */
+    .n8n-chat .chat-message-from-user {
+      background: var(--chat--color-primary) !important;
+      color: var(--chat--color-white) !important;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06) !important;
+      margin-left: auto !important;
+      margin-right: 0.5rem !important;
+    }
+    
+    /* === ZONE D'INPUT EN BAS === */
+    .n8n-chat .chat-footer {
+      background: var(--chat--color-white);
+      border-top: 1px solid #eee;
+      padding: 0.5rem 0.75rem;
+    }
+    
+    /* aligne textarea + bouton sur la même ligne */
+    .n8n-chat .chat-inputs {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    /* bloc textarea entouré d’un cadre coloré comme sur le screen */
+    .n8n-chat textarea[data-test-id="chat-input"] {
+      flex: 1;
+      border-radius: 15px;
+      border: 2px solid var(--chat--color-third);    /* bord jaune/orange, change la couleur si tu veux */
+      padding: 0.45rem 0.9rem;
+      resize: none;
+      outline: none;
+      font-size: 0.95rem;
+      background: var(--chat--color-white);
+    }
+    
+    /* bouton Send, bien centré */
+    .n8n-chat .chat-inputs-controls button {
+      height: 40px;
+      min-width: 80px;
+      border-radius: 15px;
+      background: var(--chat--color-primary);
+      color: var(--chat--color-white);;
+      border: none;
+      font-weight: 600;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    
+    /* hover du bouton */
+    .n8n-chat .chat-inputs-controls button:hover {
+      background: var(--chat--color-secondary);
+    }
+    
+    /* si tu utilises encore une icône en <svg>, on la masque pour garder seulement "Send" */
+    .n8n-chat .chat-inputs-controls button svg {
+      display: none;
+    }
+    
+    /* Remplace l'icône par ton texte */
+    .n8n-chat .chat-inputs-controls button::after {
+      content: "Send";     /* ⬅️ C’EST ICI QUE TU METS TON TEXTE */
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: white;        /* couleur du texte */
+    }
+  }
 </body>
 </html>
+
 
 
 

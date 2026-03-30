@@ -1,0 +1,1488 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulateur Tarification — Soil Cover API · Kermap</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-deep: #f5f7f6;
+      --bg: #ffffff;
+      --bg-raised: #f9faf9;
+      --bg-card: #ffffff;
+      --bg-input: #f3f5f4;
+      --border: #dfe5e1;
+      --border-subtle: #e8ece9;
+      --border-hover: #c5d0c8;
+      --border-active: #1a9d5a;
+      --text-primary: #1a2b22;
+      --text-secondary: #4a6355;
+      --text-tertiary: #7a9488;
+      --text-muted: #a3b5ab;
+      --green-bright: #1a9d5a;
+      --green-mid: #178a4e;
+      --green-dim: #d0edde;
+      --green-ghost: rgba(26, 157, 90, 0.05);
+      --green-glow: rgba(26, 157, 90, 0.08);
+      --amber: #c07800;
+      --amber-dim: #9a6200;
+      --amber-ghost: rgba(192, 120, 0, 0.06);
+      --amber-glow: rgba(192, 120, 0, 0.1);
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; -webkit-font-smoothing: antialiased; }
+
+    body {
+      background: var(--bg-deep);
+      color: var(--text-primary);
+      font-family: 'Outfit', system-ui, sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Atmosphere ── */
+    .atmosphere {
+      position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background:
+        radial-gradient(ellipse 80% 50% at 10% 10%, rgba(26, 157, 90, 0.04) 0%, transparent 70%),
+        radial-gradient(ellipse 50% 60% at 90% 90%, rgba(192, 120, 0, 0.03) 0%, transparent 70%);
+    }
+
+    .bg-map {
+      position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background: url('https://kermap.com/wp-content/uploads/2026/03/visuel-ddc.jpg') center / cover no-repeat;
+      -webkit-mask-image: linear-gradient(135deg, transparent 0%, transparent 20%, rgba(0,0,0,0.5) 100%);
+      mask-image: linear-gradient(135deg, transparent 0%, transparent 20%, rgba(0,0,0,0.5) 100%);
+    }
+
+    .grid-lines {
+      position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: 0.5;
+      background-image:
+        repeating-linear-gradient(90deg, transparent, transparent 79px, rgba(26, 157, 90, 0.035) 79px, rgba(26, 157, 90, 0.035) 80px),
+        repeating-linear-gradient(0deg, transparent, transparent 79px, rgba(26, 157, 90, 0.025) 79px, rgba(26, 157, 90, 0.025) 80px);
+    }
+
+    /* ── Layout ── */
+    .shell { position: relative; z-index: 1; max-width: 1280px; margin: 0 auto; padding: 0 28px; }
+
+    /* ── Header ── */
+    .topbar {
+      padding: 24px 0;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 48px;
+    }
+
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand-logo { height: 32px; width: auto; }
+    .brand-name { font-size: 18px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.02em; }
+
+    .tag {
+      font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 400;
+      color: var(--text-tertiary); letter-spacing: 0.06em; text-transform: uppercase;
+      border: 1px solid var(--border); border-radius: 6px; padding: 5px 12px;
+      background: var(--bg);
+    }
+
+    /* ── Hero ── */
+    .hero { margin-bottom: 52px; }
+
+    .hero h1 {
+      font-size: clamp(34px, 4.5vw, 56px); font-weight: 800;
+      line-height: 1.08; letter-spacing: -0.035em;
+      margin-bottom: 14px; color: var(--text-primary);
+    }
+
+    .hero h1 span {
+      background: linear-gradient(135deg, var(--green-bright), #22b866);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero p { color: var(--text-secondary); font-size: 16px; font-weight: 400; max-width: 520px; line-height: 1.65; }
+
+    /* ── Grid ── */
+    .layout {
+      display: grid; grid-template-columns: 1fr 400px;
+      gap: 28px; align-items: start; margin-bottom: 80px;
+    }
+
+    @media (max-width: 960px) {
+      .layout { grid-template-columns: 1fr; }
+      .result-col { position: static !important; }
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.02);
+    }
+
+    .card + .card { margin-top: 20px; }
+
+    .card-head {
+      padding: 16px 22px;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex; align-items: center; gap: 10px;
+      background: var(--bg-raised);
+    }
+
+    .card-head::before {
+      content: ''; width: 7px; height: 7px; border-radius: 50%;
+      background: var(--green-bright);
+      box-shadow: 0 0 6px rgba(26, 157, 90, 0.35);
+      flex-shrink: 0;
+    }
+
+    .card-head-label {
+      font-size: 11.5px; font-weight: 600;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--text-tertiary);
+    }
+
+    .card-body { padding: 24px 22px; }
+
+    /* ── Surface Input ── */
+    .surface-hero { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+
+    .surface-val {
+      font-family: 'DM Mono', monospace; font-size: 42px; font-weight: 500;
+      color: var(--amber); line-height: 1; letter-spacing: -0.02em;
+    }
+
+    .surface-unit { font-family: 'DM Mono', monospace; font-size: 15px; color: var(--text-tertiary); }
+
+    .surface-sub {
+      font-family: 'DM Mono', monospace; font-size: 13px; color: var(--text-muted);
+      margin-bottom: 18px;
+    }
+
+    /* ── Range ── */
+    .range-wrap { position: relative; padding: 2px 0; }
+
+    .range-track {
+      position: relative; height: 6px;
+      background: var(--border); border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .range-fill {
+      position: absolute; left: 0; top: 0; bottom: 0;
+      background: linear-gradient(90deg, var(--green-mid), var(--amber));
+      border-radius: 3px; transition: width 0.05s;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none; appearance: none;
+      position: absolute; top: -4px; left: 0; width: 100%; height: 14px;
+      background: transparent; cursor: pointer; z-index: 2;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 22px; height: 22px; border-radius: 50%;
+      background: var(--amber); border: 3px solid #fff;
+      box-shadow: 0 0 0 1px rgba(192,120,0,0.2), 0 2px 6px rgba(0,0,0,0.15);
+      transition: box-shadow 0.15s;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      box-shadow: 0 0 0 4px rgba(192,120,0,0.12), 0 2px 8px rgba(0,0,0,0.2);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 22px; height: 22px; border-radius: 50%;
+      background: var(--amber); border: 3px solid #fff;
+      box-shadow: 0 0 0 1px rgba(192,120,0,0.2), 0 2px 6px rgba(0,0,0,0.15);
+    }
+
+    .range-ticks {
+      display: flex; justify-content: space-between;
+      margin-top: 8px; padding: 0 2px;
+    }
+
+    .range-ticks span { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-muted); }
+
+    /* ── Inline input ── */
+    .inline-input { display: flex; align-items: center; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+    .inline-input label { font-size: 13px; color: var(--text-secondary); flex: 1; min-width: 80px; }
+
+    .is-mode-toggle { display: flex; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; flex-shrink: 0; }
+    .is-mode-btn { padding: 5px 11px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; background: transparent; color: var(--text-muted); border: none; cursor: pointer; transition: background 0.15s, color 0.15s; line-height: 1; }
+    .is-mode-btn:hover { color: var(--text-secondary); }
+    .is-mode-btn.active { background: var(--amber); color: #1a1408; }
+    .is-pct-computed { font-size: 11px; color: var(--text-muted); align-self: center; white-space: nowrap; }
+
+    .num-input {
+      background: var(--bg-input); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 8px 14px;
+      font-family: 'DM Mono', monospace; font-size: 14px;
+      color: var(--amber-dim); width: 150px; text-align: right;
+      outline: none; transition: border-color 0.15s;
+    }
+
+    .num-input:focus { border-color: var(--amber); }
+
+    /* ── Product cards ── */
+    .prod-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    .prod {
+      position: relative; background: var(--bg-input);
+      border: 1.5px solid var(--border); border-radius: var(--radius-md);
+      padding: 14px 14px 12px; cursor: pointer; user-select: none;
+      transition: all 0.15s;
+    }
+
+    .prod:hover { border-color: var(--border-hover); }
+    .prod.on { border-color: var(--green-mid); background: var(--green-ghost); }
+    .prod.base { border-color: var(--green-mid); background: var(--green-glow); cursor: default; }
+
+    .prod input { display: none; }
+
+    .prod-check {
+      position: absolute; top: 10px; right: 10px;
+      width: 18px; height: 18px; border-radius: 5px;
+      border: 1.5px solid var(--border-hover);
+      display: grid; place-items: center;
+      transition: all 0.15s;
+    }
+
+    .prod.on .prod-check, .prod.base .prod-check {
+      background: var(--green-bright); border-color: var(--green-bright);
+    }
+
+    .prod-check svg { width: 10px; height: 10px; opacity: 0; transition: opacity 0.1s; }
+    .prod.on .prod-check svg, .prod.base .prod-check svg { opacity: 1; }
+
+    .prod-code { font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 2px; }
+    .prod-name { font-size: 10.5px; color: var(--text-tertiary); line-height: 1.4; margin-bottom: 8px; min-height: 30px; }
+
+    .prod-tag {
+      display: inline-block; font-family: 'DM Mono', monospace;
+      font-size: 10.5px; padding: 2px 7px; border-radius: 4px;
+    }
+
+    .prod.base .prod-tag { color: var(--green-bright); background: var(--green-dim); }
+    .prod:not(.base) .prod-tag { color: var(--text-tertiary); background: var(--bg-deep); }
+    .prod.on:not(.base) .prod-tag { color: var(--green-bright); background: var(--green-dim); }
+
+    /* ── Toggle ── */
+    .toggle-row {
+      display: flex; align-items: center; gap: 16px;
+      background: var(--bg-input); border: 1.5px solid var(--border);
+      border-radius: var(--radius-md); padding: 14px 16px;
+      cursor: pointer; user-select: none; transition: all 0.15s;
+    }
+
+    .toggle-row:hover { border-color: var(--border-hover); }
+    .toggle-row.on { border-color: var(--green-mid); background: var(--green-ghost); }
+
+    .toggle-text { flex: 1; }
+    .toggle-label { font-size: 13.5px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+    .toggle-desc { font-size: 11px; color: var(--text-tertiary); }
+
+    .switch {
+      width: 42px; height: 24px; border-radius: 12px;
+      background: var(--border-hover); position: relative;
+      transition: background 0.2s; flex-shrink: 0;
+    }
+
+    .toggle-row.on .switch { background: var(--green-bright); }
+
+    .switch-knob {
+      position: absolute; top: 3px; left: 3px;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: #fff; transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+
+    .toggle-row.on .switch-knob { transform: translateX(18px); }
+
+    /* ── Result panel ── */
+    .result-col { position: sticky; top: 24px; }
+
+    .res-price {
+      padding: 32px 24px 28px; text-align: center;
+      border-bottom: 1px solid var(--border-subtle);
+      background: linear-gradient(180deg, rgba(26,157,90,0.03) 0%, transparent 100%);
+    }
+
+    .res-price-label {
+      font-size: 11px; font-weight: 600; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 4px;
+    }
+
+    .res-price-sub-label { font-size: 12px; color: var(--text-muted); margin-bottom: 14px; }
+
+    .res-price-total {
+      font-family: 'DM Mono', monospace; font-size: 48px; font-weight: 500;
+      color: var(--green-bright); line-height: 1; letter-spacing: -0.02em;
+      margin-bottom: 6px;
+    }
+
+    .res-price-original {
+      font-family: 'DM Mono', monospace; font-size: 26px; font-weight: 400;
+      color: var(--text-muted); line-height: 1; letter-spacing: -0.01em;
+      text-decoration: line-through; text-decoration-color: rgba(220, 60, 60, 0.55);
+      text-decoration-thickness: 2px;
+      margin-bottom: 6px;
+      display: none;
+    }
+
+    .res-price-ht { font-size: 12px; color: var(--text-muted); margin-bottom: 22px; }
+
+    .res-perha-chip {
+      display: inline-flex; align-items: center; gap: 10px;
+      background: var(--amber-ghost); border: 1px solid rgba(192,120,0,0.15);
+      border-radius: var(--radius-sm); padding: 9px 18px;
+    }
+
+    .res-perha-val { font-family: 'DM Mono', monospace; font-size: 18px; font-weight: 500; color: var(--amber); }
+    .res-perha-label { font-size: 11px; color: var(--text-tertiary); }
+
+    /* ── Breakdown ── */
+    .res-breakdown { padding: 20px 24px; border-bottom: 1px solid var(--border-subtle); }
+
+    .res-section-title {
+      font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--text-muted); margin-bottom: 14px;
+    }
+
+    .bk-row { display: flex; align-items: center; justify-content: space-between; padding: 7px 0; }
+    .bk-row + .bk-row { border-top: 1px solid var(--border-subtle); }
+    .bk-left { display: flex; align-items: center; gap: 10px; }
+
+    .bk-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .bk-dot.active { background: var(--green-bright); box-shadow: 0 0 5px rgba(26,157,90,0.3); }
+    .bk-dot.off { background: var(--border); }
+
+    .bk-name { font-size: 13px; font-weight: 500; }
+    .bk-name.active { color: var(--text-primary); }
+    .bk-name.off { color: var(--text-muted); }
+
+    .bk-val { font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 500; }
+    .bk-val.active { color: var(--text-primary); }
+    .bk-val.off { color: var(--text-muted); }
+
+    /* ── Summary ── */
+    .res-summary { padding: 18px 24px; }
+    .sum-row { display: flex; justify-content: space-between; padding: 4px 0; }
+    .sum-k { font-size: 12px; color: var(--text-muted); }
+    .sum-v { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text-secondary); }
+    .sum-v.green { color: var(--green-mid); }
+    .sum-v.amber { color: var(--amber-dim); }
+
+    .sum-divider { border: none; border-top: 1px dashed var(--border-subtle); margin: 8px 0; }
+    .sum-row.total .sum-k { font-weight: 600; color: var(--text-secondary); }
+    .sum-row.total .sum-v { font-weight: 500; color: var(--green-bright); font-size: 14px; }
+
+    /* ── Months selector ── */
+    .months-row { display: flex; flex-direction: column; gap: 6px; }
+
+    .months-display { display: flex; align-items: baseline; gap: 6px; margin-bottom: 2px; }
+
+    .months-val {
+      font-family: 'DM Mono', monospace; font-size: 32px; font-weight: 500;
+      color: var(--green-bright); line-height: 1;
+    }
+
+    .months-unit { font-family: 'DM Mono', monospace; font-size: 14px; color: var(--text-tertiary); }
+
+    .months-range-wrap .range-fill {
+      background: linear-gradient(90deg, var(--green-mid), var(--green-bright));
+    }
+
+    .months-ticks-all {
+      display: flex; justify-content: space-between;
+      padding: 0 2px; margin-top: 2px;
+    }
+
+    .months-ticks-all span { font-family: 'DM Mono', monospace; font-size: 9px; color: var(--text-muted); width: 0; text-align: center; }
+
+    /* ── Bundle discount badge ── */
+    .bundle-badge {
+      display: flex; align-items: center; gap: 8px;
+      margin-top: 12px; padding: 10px 14px;
+      background: linear-gradient(135deg, rgba(26,157,90,0.08), rgba(26,157,90,0.04));
+      border: 1px solid rgba(26,157,90,0.2);
+      border-radius: var(--radius-sm);
+    }
+
+    .bundle-badge-icon {
+      width: 22px; height: 22px; border-radius: 50%;
+      background: var(--green-bright); color: #fff;
+      display: grid; place-items: center; flex-shrink: 0;
+      font-size: 12px; font-weight: 700;
+    }
+
+    .bundle-badge-text { font-size: 12.5px; color: var(--green-mid); font-weight: 500; }
+    .bundle-badge-text b { font-weight: 700; }
+
+    /* ── In-season section ── */
+    .inseason-layout {
+      margin-bottom: 40px;
+    }
+
+    .inseason-desc {
+      font-size: 13px; color: var(--text-secondary); line-height: 1.6;
+      margin-bottom: 20px;
+    }
+
+    /* Individual row */
+    .is-row {
+      border: 1px solid var(--border); border-radius: var(--radius-md);
+      background: var(--bg-raised); margin-bottom: 12px; overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    .is-row:hover { border-color: var(--border-hover); }
+    .is-row-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 16px; border-bottom: 1px solid var(--border-subtle);
+      background: var(--bg-input);
+    }
+    .is-row-num {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--text-tertiary);
+    }
+    .is-delete-btn {
+      display: flex; align-items: center; gap: 5px; padding: 4px 10px;
+      border: 1px solid rgba(220,60,60,0.3); border-radius: 6px;
+      background: transparent; color: rgba(220,60,60,0.7);
+      font-size: 11px; font-weight: 500; cursor: pointer;
+      transition: all 0.15s;
+    }
+    .is-delete-btn:hover { background: rgba(220,60,60,0.08); border-color: rgba(220,60,60,0.55); color: rgba(200,40,40,0.9); }
+
+    .is-row-body {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+    }
+    @media (max-width: 800px) { .is-row-body { grid-template-columns: 1fr; } }
+
+    .is-ctrl { padding: 16px 18px; border-right: 1px solid var(--border-subtle); }
+    .is-ctrl:last-child { border-right: none; }
+    .is-ctrl-label {
+      font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 8px;
+    }
+
+    .is-val-row {
+      display: flex; align-items: baseline; gap: 6px; margin-bottom: 6px;
+    }
+    .is-val { font-family: 'DM Mono', monospace; font-size: 20px; font-weight: 500; color: var(--amber-dim); }
+    .is-unit { font-size: 13px; color: var(--text-muted); }
+
+    .is-price-area {
+      padding: 16px 18px; display: flex; flex-direction: column;
+      justify-content: center; gap: 4px;
+      background: linear-gradient(180deg, rgba(192,120,0,0.04) 0%, transparent 100%);
+    }
+    .is-price-label {
+      font-size: 10px; font-weight: 600; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--text-muted);
+    }
+    .is-price-full {
+      font-family: 'DM Mono', monospace; font-size: 14px; color: var(--text-muted);
+      text-decoration: line-through; text-decoration-color: rgba(220,60,60,0.55);
+      text-decoration-thickness: 1.5px;
+    }
+    .is-price-disc {
+      font-family: 'DM Mono', monospace; font-size: 26px; font-weight: 500;
+      color: var(--amber); letter-spacing: -0.02em;
+    }
+    .is-price-sub { font-size: 11px; color: var(--text-muted); }
+
+    /* Add row button */
+    .is-add-btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      width: 100%; padding: 12px; border: 1.5px dashed var(--border-hover);
+      border-radius: var(--radius-md); background: transparent;
+      color: var(--text-muted); font-size: 13px; font-weight: 500;
+      cursor: pointer; transition: all 0.2s; margin-bottom: 16px;
+    }
+    .is-add-btn:hover {
+      border-color: var(--amber); color: var(--amber);
+      background: var(--amber-ghost);
+    }
+
+    /* In-season total strip */
+    .is-total-strip {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px; border-radius: var(--radius-md);
+      background: rgba(192,120,0,0.06); border: 1px solid rgba(192,120,0,0.18);
+      margin-top: 4px;
+    }
+    .is-total-label { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+    .is-total-val { font-family: 'DM Mono', monospace; font-size: 24px; font-weight: 500; color: var(--amber); }
+
+    .inseason-sub { font-size: 12px; color: var(--text-muted); }
+
+    /* In-season tick marks */
+    .is-ha-ticks {
+      position: relative; height: 14px; margin-top: 2px; margin-bottom: 4px;
+    }
+    .is-ha-ticks span {
+      position: absolute; transform: translateX(-50%);
+      font-size: 9px; color: var(--text-muted); white-space: nowrap;
+    }
+    .is-mo-ticks {
+      display: flex; justify-content: space-between; margin-top: 2px;
+      font-size: 9px; color: var(--text-muted);
+    }
+
+    .grand-total-bar {
+      padding: 20px 24px;
+      background: linear-gradient(180deg, rgba(26,157,90,0.06) 0%, transparent 100%);
+    }
+
+    .grand-total-label {
+      font-size: 11px; font-weight: 600; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;
+    }
+
+    .grand-total-val {
+      font-family: 'DM Mono', monospace; font-size: 42px; font-weight: 500;
+      color: var(--green-bright); line-height: 1; letter-spacing: -0.025em;
+    }
+
+    .grand-total-ht { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+    /* ── Géocrédits ── */
+    .gc-section {
+      margin-bottom: 40px;
+    }
+
+    .gc-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 22px; cursor: pointer; user-select: none;
+      background: var(--bg-raised); border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .gc-header-left { display: flex; align-items: center; gap: 10px; }
+
+    .gc-header-left::before {
+      content: ''; width: 7px; height: 7px; border-radius: 50%;
+      background: var(--amber); box-shadow: 0 0 6px rgba(192,120,0,0.35);
+      flex-shrink: 0;
+    }
+
+    .gc-header-label {
+      font-size: 11.5px; font-weight: 600;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--text-tertiary);
+    }
+
+    .gc-header-total {
+      font-family: 'DM Mono', monospace; font-size: 14px;
+      font-weight: 500; color: var(--amber-dim);
+    }
+
+    .gc-arrow {
+      width: 18px; height: 18px; color: var(--text-muted);
+      transition: transform 0.25s; flex-shrink: 0;
+    }
+
+    .gc-section.open .gc-arrow { transform: rotate(180deg); }
+
+    .gc-body {
+      max-height: 0; overflow: hidden;
+      transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .gc-section.open .gc-body { max-height: 600px; }
+
+    .gc-inner { padding: 20px 22px; }
+
+    .gc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }
+
+    .gc-chip {
+      background: var(--bg-input); border: 1px solid var(--border);
+      border-radius: var(--radius-md); padding: 14px 16px;
+    }
+
+    .gc-chip.bundle { border-color: var(--green-mid); background: var(--green-ghost); }
+    .gc-chip.inseason { border-color: rgba(192,120,0,0.3); background: var(--amber-ghost); }
+
+    .gc-chip-code { font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 2px; }
+    .gc-chip-formula { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-muted); margin-bottom: 8px; }
+    .gc-chip-val { font-family: 'DM Mono', monospace; font-size: 22px; font-weight: 500; color: var(--amber-dim); }
+    .gc-chip-unit { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+    .gc-total-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px; border-radius: var(--radius-md);
+      background: linear-gradient(135deg, rgba(192,120,0,0.07), rgba(192,120,0,0.03));
+      border: 1px solid rgba(192,120,0,0.2);
+    }
+
+    .gc-total-label { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+    .gc-total-val { font-family: 'DM Mono', monospace; font-size: 28px; font-weight: 500; color: var(--amber-dim); }
+    .gc-total-unit { font-size: 11px; color: var(--text-muted); }
+
+    /* ── Footer ── */
+    .foot {
+      text-align: center; padding: 40px 0;
+      border-top: 1px solid var(--border-subtle);
+      color: var(--text-muted); font-size: 12.5px; line-height: 1.6;
+    }
+
+    /* ── Animations ── */
+    @keyframes rise { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .rise { animation: rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+    .rise-1 { animation-delay: 0.04s; opacity: 0; }
+    .rise-2 { animation-delay: 0.1s; opacity: 0; }
+    .rise-3 { animation-delay: 0.16s; opacity: 0; }
+    .rise-4 { animation-delay: 0.22s; opacity: 0; }
+
+    .price-anim { transition: color 0.15s; }
+  </style>
+</head>
+<body>
+
+<div class="atmosphere"></div>
+<div class="bg-map"></div>
+<div class="grid-lines"></div>
+
+<div class="shell">
+
+  <!-- ─── TOPBAR ─── -->
+  <div class="topbar rise rise-1">
+    <div class="brand">
+      <img src="https://kermap.com/wp-content/uploads/2025/10/kermap-logo-symbole.png" alt="Kermap" class="brand-logo">
+      <span class="brand-name">Kermap</span>
+    </div>
+    <div class="tag">Soil Cover API · Tarification 2026</div>
+  </div>
+
+  <!-- ─── HERO ─── -->
+  <div class="hero rise rise-2">
+    <h1>Simulateur de<br><span>tarification</span></h1>
+    <p>Estimez le coût de vos analyses de couverture des sols.<br>Tarification à l'hectare, dégressive selon la surface.</p>
+  </div>
+
+  <!-- ─── MAIN GRID ─── -->
+  <div class="layout">
+
+    <!-- LEFT: Controls -->
+    <div class="controls-col rise rise-3">
+
+      <!-- Surface -->
+      <div class="card">
+        <div class="card-head"><span class="card-head-label">Surface analysée</span></div>
+        <div class="card-body">
+          <div class="surface-hero">
+            <div class="surface-val" id="surfaceDisplay">25 000</div>
+            <div class="surface-unit">ha</div>
+          </div>
+          <div class="surface-sub" id="surfaceKm2">250 km²</div>
+
+          <div class="range-wrap">
+            <div class="range-track">
+              <div class="range-fill" id="rangeFill" style="width:44%"></div>
+            </div>
+            <input type="range" id="surfaceSlider" min="0" max="1000" value="440" step="1">
+          </div>
+          <div class="range-ticks">
+            <span>100</span><span>1 000</span><span>10 000</span><span>100 000</span><span>1 000 000</span><span>5 000 000</span>
+          </div>
+
+          <div class="inline-input">
+            <label>Saisie directe</label>
+            <input type="number" class="num-input" id="surfaceInput" value="25000" min="100" max="5000000" step="100">
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Months -->
+      <div class="card">
+        <div class="card-head"><span class="card-head-label">Nombre de mois</span></div>
+        <div class="card-body">
+          <div class="months-row">
+            <div class="months-display">
+              <span class="months-val" id="monthsDisplay">12</span>
+              <span class="months-unit">mois</span>
+            </div>
+            <div class="range-wrap months-range-wrap">
+              <div class="range-track">
+                <div class="range-fill months-fill" id="monthsFill" style="width:64.7%"></div>
+              </div>
+              <input type="range" id="monthsSlider" min="1" max="18" value="12" step="1">
+            </div>
+            <div class="months-ticks-all">
+              <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span><span>13</span><span>14</span><span>15</span><span>16</span><span>17</span><span>18</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Products -->
+      <div class="card">
+        <div class="card-head"><span class="card-head-label">Modules souscrits</span></div>
+        <div class="card-body">
+          <div class="prod-grid">
+
+            <div class="prod base" id="card-ddc">
+              <div class="prod-check"><svg viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-6" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div class="prod-code">DDC</div>
+              <div class="prod-name">Durée De Couverture</div>
+              <div class="prod-tag">Base · inclus</div>
+            </div>
+
+            <div class="prod" id="card-ndvi" data-key="ndvi">
+              <div class="prod-check"><svg viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-6" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div class="prod-code">NDVI</div>
+              <div class="prod-name">Courbes NDVI</div>
+              <div class="prod-tag">+15 % du DDC</div>
+            </div>
+
+            <div class="prod" id="card-hcouv" data-key="hcouv">
+              <div class="prod-check"><svg viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-6" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div class="prod-code">HCOUV</div>
+              <div class="prod-name">Homogénéité du Couvert</div>
+              <div class="prod-tag">+20 % du DDC</div>
+            </div>
+
+            <div class="prod" id="card-pcouv" data-key="pcouv">
+              <div class="prod-check"><svg viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-6" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div class="prod-code">PCOUV</div>
+              <div class="prod-name">Surface Couverte</div>
+              <div class="prod-tag">+15 % du DDC</div>
+            </div>
+
+          </div>
+          <div class="bundle-badge" id="bundleBadge" style="display:none">
+            <div class="bundle-badge-icon">%</div>
+            <div class="bundle-badge-text">Pack complet activé · remise de <b>−15 %</b> appliquée</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Options -->
+      <div class="card">
+        <div class="card-head"><span class="card-head-label">Territoire de référence</span></div>
+        <div class="card-body">
+          <div class="toggle-row" id="toggleTerritory">
+            <div class="toggle-text">
+              <div class="toggle-label">Territoire de référence</div>
+              <div class="toggle-desc">Périmètre d'intervention défini · valorisation +15 %</div>
+            </div>
+            <div class="switch"><div class="switch-knob"></div></div>
+          </div>
+          <div style="margin-top:12px; font-family:'DM Mono',monospace; font-size:13px; color:var(--text-tertiary); text-align:right;">
+            Territoire de référence : <span id="territoryCostDisplay" style="color:var(--green-mid); font-weight:500;">0 €</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT: Results -->
+    <div class="result-col rise rise-4">
+      <div class="card">
+
+        <div class="res-price">
+          <div class="res-price-label">Prix par campagne</div>
+          <div class="res-price-sub-label">DDC + modules sélectionnés</div>
+          <div class="res-price-original" id="priceOriginal"></div>
+          <div class="res-price-total price-anim" id="priceCampaign">—</div>
+          <div class="res-price-ht">€ HT · par campagne</div>
+          <div class="res-perha-chip">
+            <div class="res-perha-val" id="pricePerHa">—</div>
+            <div class="res-perha-label">€ / ha / campagne</div>
+          </div>
+        </div>
+
+        <div class="res-breakdown">
+          <div class="res-section-title">Détail par module · 1 campagne</div>
+          <div id="breakdownRows"></div>
+        </div>
+
+        <div class="res-summary" id="summaryBlock"></div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ─── EN COURS DE SAISON ─── -->
+  <div class="inseason-layout rise rise-4">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-head-label">En cours de saison</span>
+        <span style="font-size:11px;color:var(--text-muted);font-weight:400;">prix à l'hectare × 50 %</span>
+      </div>
+      <div class="card-body">
+        <p class="inseason-desc">
+          Option complémentaire : analyse de surface supplémentaire en cours de saison, facturée à 50% du prix à l'hectare calculé ci-dessus.
+        </p>
+
+        <!-- Rows injected here by JS -->
+        <div id="isRowsContainer"></div>
+
+        <!-- Add row button -->
+        <button class="is-add-btn" id="isAddBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Ajouter une production En cours de saison
+        </button>
+
+        <!-- In-season subtotal -->
+        <div class="is-total-strip" id="isTotalStrip" style="display:none;">
+          <div class="is-total-label">Total en cours de saison</div>
+          <div class="is-total-val" id="isTotalVal">0 €</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Grand total full-width below -->
+    <div class="card" style="margin-top:16px;">
+      <div class="grand-total-bar">
+        <div class="grand-total-label">Total général</div>
+        <div class="grand-total-val price-anim" id="grandTotalDisplay">—</div>
+        <div class="grand-total-ht">€ HT · toutes options incluses</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── GÉOCRÉDITS ─── -->
+  <div class="gc-section card" id="gcSection">
+    <div class="gc-header" id="gcToggle">
+      <div class="gc-header-left">
+        <span class="gc-header-label">Géocrédits</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;">
+        <span class="gc-header-total" id="gcHeaderTotal">— GC</span>
+        <svg class="gc-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+    </div>
+    <div class="gc-body">
+      <div class="gc-inner" id="gcInner"></div>
+    </div>
+  </div>
+
+  <!-- ─── FOOTER ─── -->
+  <div class="foot rise rise-4">
+    Prix calculés en € HT · barème Kermap 2026<br>
+    Simulation indicative et non contractuelle
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════
+const TABLE = [
+  { ha: 100,     ddc: 900   },
+  { ha: 500,     ddc: 1440  },
+  { ha: 1000,    ddc: 1980  },
+  { ha: 2000,    ddc: 3150  },
+  { ha: 5000,    ddc: 5580  },
+  { ha: 7500,    ddc: 6840  },
+  { ha: 10000,   ddc: 7830  },
+  { ha: 20000,   ddc: 10170 },
+  { ha: 50000,   ddc: 13320 },
+  { ha: 100000,  ddc: 22230 },
+  { ha: 200000,  ddc: 27720 },
+  { ha: 500000,  ddc: 35190 },
+  { ha: 1000000, ddc: 40770 },
+];
+
+const FACTORS = { ndvi: 0.15, hcouv: 0.20, pcouv: 0.15 };
+const TERRITORY = 0.15;
+
+// Log formula for > 50 000 ha: DDC = 9000 * ln(ha) - 79000
+
+function ddcFormula(ha) {
+  // Only used for > 50 000 ha (extreme range), −10% applied
+  return (9000 * Math.log(ha) - 79000) * 0.9;
+}
+
+function interpolateDDC(ha) {
+  if (ha <= TABLE[0].ha) return TABLE[0].ddc;
+  // Beyond 1M ha: extrapolate with formula
+  if (ha > TABLE[TABLE.length - 1].ha) return Math.max(ddcFormula(ha), TABLE[TABLE.length - 1].ddc);
+
+  // Check exact table match
+  for (const entry of TABLE) {
+    if (ha === entry.ha) return entry.ddc;
+  }
+
+  // > 50 000 ha: use log formula (matches Excel behavior)
+  if (ha > 50000) {
+    return Math.max(ddcFormula(ha), TABLE[0].ddc);
+  }
+
+  // ≤ 50 000 ha: log-linear interpolation between table points
+  for (let i = 0; i < TABLE.length - 1; i++) {
+    if (ha >= TABLE[i].ha && ha <= TABLE[i + 1].ha) {
+      const t = (Math.log(ha) - Math.log(TABLE[i].ha))
+              / (Math.log(TABLE[i + 1].ha) - Math.log(TABLE[i].ha));
+      return TABLE[i].ddc + t * (TABLE[i + 1].ddc - TABLE[i].ddc);
+    }
+  }
+}
+
+function tierLabel(ha) {
+  if (ha <= TABLE[0].ha) return `≤ ${fmt(TABLE[0].ha)} ha`;
+  if (ha >= TABLE[TABLE.length - 1].ha) return `≥ ${fmt(TABLE[TABLE.length - 1].ha)} ha`;
+  for (let i = 0; i < TABLE.length - 1; i++) {
+    if (ha >= TABLE[i].ha && ha <= TABLE[i + 1].ha)
+      return `${fmt(TABLE[i].ha)} ha — ${fmt(TABLE[i + 1].ha)} ha`;
+  }
+}
+
+// ═══════════════════════════════════════
+// STATE (no campaigns anymore)
+// ═══════════════════════════════════════
+const BUNDLE_DISCOUNT = 0.15; // -15% when all 4 products selected
+const GC = { ddc: 100, ndvi: 15, hcouv: 20, pcouv: 15, bundle: 128 };
+let _isRowId = 0;
+const state = { ha: 25000, months: 12, prods: { ndvi: false, hcouv: false, pcouv: false }, territory: false, inSeasonRows: [] };
+
+// ═══════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════
+const fmt  = n => Math.round(n).toLocaleString('fr-FR');
+const fmtP = n => n === 0 ? '0 €' : fmt(n) + ' €';
+const fmtH = n => n < 0.01 ? n.toFixed(4) : n < 0.1 ? n.toFixed(3) : n.toFixed(2);
+const sliderToHa = v => Math.round(Math.exp(Math.log(100) + (v / 1000) * (Math.log(5000000) - Math.log(100))));
+const haToSlider  = h => Math.round(((Math.log(h) - Math.log(100)) / (Math.log(5000000) - Math.log(100))) * 1000);
+// In-season slider uses same scale as main slider (0-1000) with a 0→0 special case
+const inSeasonSliderToHa = (sv, maxSv) => sv === 0 ? 0 : (sv === maxSv ? sliderToHa(maxSv) : sliderToHa(sv));
+const inSeasonHaToSlider = (h, maxHaSv) => h === 0 ? 0 : Math.min(haToSlider(h), maxHaSv);
+
+let _anim = null, _current = 0;
+function animateNumber(el, target) {
+  if (_anim) cancelAnimationFrame(_anim);
+  const start = _current, diff = target - start, dur = 350;
+  let t0 = null;
+  function step(ts) {
+    if (!t0) t0 = ts;
+    const p = Math.min((ts - t0) / dur, 1);
+    const ease = 1 - Math.pow(1 - p, 3);
+    _current = start + diff * ease;
+    el.textContent = fmtP(_current);
+    if (p < 1) _anim = requestAnimationFrame(step);
+    else { _current = target; el.textContent = fmtP(target); }
+  }
+  _anim = requestAnimationFrame(step);
+}
+
+// ═══════════════════════════════════════
+// COMPUTE & RENDER
+// ═══════════════════════════════════════
+function compute() {
+  const { ha, months, prods, territory } = state;
+  const ddcAnnual = interpolateDDC(ha);
+  const ddcBase = ddcAnnual * months / 12; // prorata mensuel
+  const tMult = territory ? 1 + TERRITORY : 1;
+
+  // Check if all products are selected for bundle discount
+  const allSelected = prods.ndvi && prods.hcouv && prods.pcouv;
+  const bundleMult = allSelected ? (1 - BUNDLE_DISCOUNT) : 1;
+
+  // Products are additive: NDVI = +30% of DDC, etc.
+  const ddc1   = ddcBase * tMult * bundleMult;
+  const ndvi1  = prods.ndvi  ? ddcBase * FACTORS.ndvi  * tMult * bundleMult : 0;
+  const hcouv1 = prods.hcouv ? ddcBase * FACTORS.hcouv * tMult * bundleMult : 0;
+  const pcouv1 = prods.pcouv ? ddcBase * FACTORS.pcouv * tMult * bundleMult : 0;
+  const perCamp = ddc1 + ndvi1 + hcouv1 + pcouv1;
+
+  // Price before bundle discount (for struck-through display)
+  const perCampBeforeBundle = allSelected
+    ? (ddcBase * tMult) * (1 + (prods.ndvi ? FACTORS.ndvi : 0) + (prods.hcouv ? FACTORS.hcouv : 0) + (prods.pcouv ? FACTORS.pcouv : 0))
+    : perCamp;
+
+  const perHa = perCamp / ha;
+
+  // Territory surcharge in euros (what +15% adds to the total)
+  const selectedFactorSum = 1
+    + (prods.ndvi  ? FACTORS.ndvi  : 0)
+    + (prods.hcouv ? FACTORS.hcouv : 0)
+    + (prods.pcouv ? FACTORS.pcouv : 0);
+  const territoryAmount = ddcBase * bundleMult * selectedFactorSum * TERRITORY;
+
+  // Annual per-ha rate (before months prorata) — used as base for in-season rows
+  const perHaAnnual = perHa / (months / 12);
+
+  // In-season rows: each row uses its own ha & months, at 50% of annual per-ha rate
+  const inSeasonRowData = state.inSeasonRows.map(row => {
+    const full = row.ha * perHaAnnual * (row.months / 12);
+    const disc = full / 2;
+    return { ...row, full, disc };
+  });
+  const inSeasonTotal = inSeasonRowData.reduce((s, r) => s + r.disc, 0);
+  const grandTotal = perCamp + inSeasonTotal;
+
+  // Géocrédits
+  const gcPerHaPerMonth = allSelected
+    ? GC.bundle
+    : GC.ddc + (prods.ndvi ? GC.ndvi : 0) + (prods.hcouv ? GC.hcouv : 0) + (prods.pcouv ? GC.pcouv : 0);
+  const gcMain     = ha * months * gcPerHaPerMonth;
+  const gcInSeason = state.inSeasonRows.reduce((s, r) => s + r.ha * r.months * gcPerHaPerMonth, 0);
+  const gcGrandTotal = gcMain + gcInSeason;
+
+  return { ddcAnnual, ddcBase, ddc1, ndvi1, hcouv1, pcouv1, perCamp, perCampBeforeBundle, perHa, perHaAnnual, inSeasonRowData, inSeasonTotal, grandTotal, allSelected, bundleMult, territoryAmount, gcPerHaPerMonth, gcMain, gcInSeason, gcGrandTotal };
+}
+
+function render() {
+  const { ha, months, prods, territory } = state;
+  const r = compute();
+
+  // Surface
+  document.getElementById('surfaceDisplay').textContent = fmt(ha);
+  document.getElementById('surfaceKm2').textContent = fmt(Math.round(ha / 100)) + ' km²';
+  document.getElementById('surfaceInput').value = ha;
+  document.getElementById('surfaceSlider').value = haToSlider(ha);
+  document.getElementById('rangeFill').style.width = (haToSlider(ha) / 10) + '%';
+
+
+  // Months
+  document.getElementById('monthsDisplay').textContent = months;
+  document.getElementById('monthsSlider').value = months;
+  document.getElementById('monthsFill').style.width = ((months - 1) / 17 * 100) + '%';
+
+  // Price
+  const origEl = document.getElementById('priceOriginal');
+  if (r.allSelected) {
+    origEl.style.display = 'block';
+    origEl.textContent = fmtP(r.perCampBeforeBundle);
+  } else {
+    origEl.style.display = 'none';
+  }
+  animateNumber(document.getElementById('priceCampaign'), r.perCamp);
+  document.getElementById('pricePerHa').textContent = fmtH(r.perHa);
+
+  // Bundle badge
+  document.getElementById('bundleBadge').style.display = r.allSelected ? 'flex' : 'none';
+
+  // Breakdown
+  const items = [
+    { code: 'DDC',   price: r.ddc1,   on: true },
+    { code: 'NDVI',  price: r.ndvi1,  on: prods.ndvi },
+    { code: 'HCOUV', price: r.hcouv1, on: prods.hcouv },
+    { code: 'PCOUV', price: r.pcouv1, on: prods.pcouv },
+  ];
+  document.getElementById('breakdownRows').innerHTML = items.map(i => `
+    <div class="bk-row">
+      <div class="bk-left">
+        <div class="bk-dot ${i.on ? 'active' : 'off'}"></div>
+        <div class="bk-name ${i.on ? 'active' : 'off'}">${i.code}</div>
+      </div>
+      <div class="bk-val ${i.on ? 'active' : 'off'}">${i.on ? fmtP(i.price) : '—'}</div>
+    </div>`).join('');
+
+  // Summary
+  const bundleLine = r.allSelected
+    ? `<div class="sum-row"><span class="sum-k">Remise pack complet</span><span class="sum-v green">−${Math.round(BUNDLE_DISCOUNT * 100)} %</span></div>` : '';
+
+  document.getElementById('territoryCostDisplay').textContent = fmtP(r.territoryAmount);
+
+  document.getElementById('summaryBlock').innerHTML = `
+    <div class="sum-row"><span class="sum-k">Surface</span><span class="sum-v">${fmt(ha)} ha</span></div>
+    <div class="sum-row"><span class="sum-k">Période analysée</span><span class="sum-v">${months} mois</span></div>
+    <div class="sum-row"><span class="sum-k">DDC base annuel</span><span class="sum-v">${fmtP(r.ddcAnnual)}</span></div>
+    <div class="sum-row"><span class="sum-k">Territoire de référence</span><span class="sum-v ${territory ? 'green' : 'amber'}">${territory ? '+' + fmtP(r.territoryAmount) : 'Non'}</span></div>
+    ${bundleLine}`;
+
+  // In-season rows
+  renderInSeasonRows(r);
+  document.getElementById('grandTotalDisplay').textContent = fmtP(r.grandTotal);
+
+  // Géocrédits
+  renderGC(r);
+}
+
+// ─── Géocrédits render (called from render() and in-season delegation) ───
+const fmtGC = n => Math.round(n).toLocaleString('fr-FR');
+
+function renderGC(r) {
+  const { ha, months, prods } = state;
+  document.getElementById('gcHeaderTotal').textContent = fmtGC(r.gcGrandTotal) + ' GC';
+
+  const chips = [];
+  if (r.allSelected) {
+    chips.push({ code: 'Pack complet', formula: `${fmtGC(ha)} ha × ${months} mois × ${GC.bundle} GC/ha/mois`, val: r.gcMain, cls: 'bundle' });
+  } else {
+    chips.push({ code: 'DDC', formula: `${fmtGC(ha)} ha × ${months} mois × ${GC.ddc} GC/ha/mois`, val: ha * months * GC.ddc, cls: '' });
+    if (prods.ndvi)  chips.push({ code: 'NDVI',  formula: `${fmtGC(ha)} ha × ${months} mois × ${GC.ndvi} GC/ha/mois`,  val: ha * months * GC.ndvi,  cls: '' });
+    if (prods.hcouv) chips.push({ code: 'HCOUV', formula: `${fmtGC(ha)} ha × ${months} mois × ${GC.hcouv} GC/ha/mois`, val: ha * months * GC.hcouv, cls: '' });
+    if (prods.pcouv) chips.push({ code: 'PCOUV', formula: `${fmtGC(ha)} ha × ${months} mois × ${GC.pcouv} GC/ha/mois`, val: ha * months * GC.pcouv, cls: '' });
+  }
+  state.inSeasonRows.forEach((row, i) => {
+    if (row.ha === 0) return;
+    const val = row.ha * row.months * r.gcPerHaPerMonth;
+    chips.push({
+      code: `En cours de saison ${i + 1}`,
+      formula: `${fmtGC(row.ha)} ha × ${row.months} mois × ${r.gcPerHaPerMonth} GC/ha/mois`,
+      val, cls: 'inseason'
+    });
+  });
+
+  const nbSaison = state.inSeasonRows.filter(r => r.ha > 0).length;
+  document.getElementById('gcInner').innerHTML = `
+    <div class="gc-grid">
+      ${chips.map(c => `
+        <div class="gc-chip ${c.cls}">
+          <div class="gc-chip-code">${c.code}</div>
+          <div class="gc-chip-formula">${c.formula}</div>
+          <div class="gc-chip-val">${fmtGC(c.val)}</div>
+          <div class="gc-chip-unit">géocrédits</div>
+        </div>`).join('')}
+    </div>
+    <div class="gc-total-row">
+      <div>
+        <div class="gc-total-label">Total Géocrédits</div>
+        <div class="gc-total-unit">surface principale${nbSaison > 0 ? ` + ${nbSaison} production${nbSaison > 1 ? 's' : ''} en cours de saison` : ''}</div>
+      </div>
+      <div class="gc-total-val">${fmtGC(r.gcGrandTotal)} <span style="font-size:14px;color:var(--text-muted)">GC</span></div>
+    </div>`;
+}
+
+// ═══════════════════════════════════════
+// EVENTS
+// ═══════════════════════════════════════
+document.getElementById('surfaceSlider').addEventListener('input', function () {
+  state.ha = Math.max(100, sliderToHa(+this.value));
+  render();
+});
+
+document.getElementById('surfaceInput').addEventListener('input', function () {
+  const v = parseInt(this.value, 10);
+  if (v >= 100 && v <= 5000000) { state.ha = v; render(); }
+});
+
+// ─── In-season multi-row management ───
+
+// Helpers: fill % relative to slider max
+const isHaFillPct = (sv, maxSv) => maxSv > 0 ? (sv / maxSv * 100).toFixed(1) + '%' : '0%';
+const isMoFillPct = (mo, maxMo) => maxMo > 1 ? ((mo - 1) / (maxMo - 1) * 100).toFixed(1) + '%' : '100%';
+
+// Tick helpers
+const HA_TICK_REFS = [
+  {ha:100,l:'100'},{ha:500,l:'500'},{ha:1000,l:'1k'},{ha:2000,l:'2k'},
+  {ha:5000,l:'5k'},{ha:10000,l:'10k'},{ha:20000,l:'20k'},{ha:50000,l:'50k'},
+  {ha:100000,l:'100k'},{ha:200000,l:'200k'},{ha:500000,l:'500k'},
+  {ha:1000000,l:'1M'},{ha:2000000,l:'2M'},{ha:5000000,l:'5M'},
+];
+function isHaTicksHtml(maxHa, maxHaSv) {
+  return HA_TICK_REFS
+    .filter(r => r.ha <= maxHa)
+    .map(r => {
+      const pct = (haToSlider(r.ha) / maxHaSv * 100).toFixed(1);
+      return `<span style="left:${pct}%">${r.l}</span>`;
+    }).join('');
+}
+function isMoTicksHtml(maxMo) {
+  return Array.from({length: maxMo}, (_, i) => `<span>${i + 1}</span>`).join('');
+}
+
+// Build the static skeleton of a row (inputs only — prices updated separately)
+function buildIsRowEl(row, idx) {
+  // Clamp initial values to main limits
+  row.ha     = Math.min(row.ha, state.ha);
+  row.months = Math.min(row.months, state.months);
+
+  const maxHaSv = haToSlider(state.ha);
+  const sliderVal = row.ha === 0 ? 0 : inSeasonHaToSlider(row.ha, maxHaSv);
+
+  const div = document.createElement('div');
+  div.className = 'is-row';
+  div.id = 'is-row-' + row.id;
+  div.dataset.rowId = row.id;
+  div.innerHTML = `
+    <div class="is-row-head">
+      <span class="is-row-num">En cours de saison ${idx + 1}</span>
+      <button class="is-delete-btn" data-delete="${row.id}">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        Supprimer
+      </button>
+    </div>
+    <div class="is-row-body">
+      <!-- Surface -->
+      <div class="is-ctrl">
+        <div class="is-ctrl-label">Surface analysée <span class="is-limit-label" style="font-weight:400;color:var(--text-muted);">· max ${fmt(state.ha)} ha</span></div>
+        <div class="is-val-row">
+          <span class="is-ha-val">${fmt(row.ha)}</span>
+          <span class="is-unit">ha</span>
+          <span class="is-ha-km" style="font-size:11px;color:var(--text-muted);margin-left:4px;">${row.ha > 0 ? '· ' + fmt(Math.round(row.ha/100)) + ' km²' : ''}</span>
+        </div>
+        <div class="range-wrap" style="margin-bottom:4px;">
+          <div class="range-track">
+            <div class="range-fill is-ha-fill" style="background:var(--amber);width:${isHaFillPct(sliderVal, maxHaSv)}"></div>
+          </div>
+          <input class="is-ha-slider" type="range" min="0" max="${maxHaSv}" value="${sliderVal}" step="1">
+        </div>
+        <div class="is-ha-ticks">${isHaTicksHtml(state.ha, maxHaSv)}</div>
+        <div class="inline-input" style="margin-top:8px;">
+          <label>Saisie directe</label>
+          <div class="is-mode-toggle">
+            <button class="is-mode-btn is-btn-ha${row.haMode !== 'pct' ? ' active' : ''}" type="button">ha</button>
+            <button class="is-mode-btn is-btn-pct${row.haMode === 'pct' ? ' active' : ''}" type="button">%</button>
+          </div>
+          <input class="num-input is-ha-input" type="number" value="${row.ha}" min="0" max="${state.ha}" step="100" style="${row.haMode === 'pct' ? 'display:none;' : ''}width:130px;">
+          <input class="num-input is-pct-input" type="number" value="${row.pct ?? Math.round(row.ha / state.ha * 100)}" min="0" max="100" step="1" style="${row.haMode !== 'pct' ? 'display:none;' : ''}width:80px;">
+          <span class="is-pct-computed" style="${row.haMode !== 'pct' ? 'display:none;' : ''}">= ${fmt(row.ha)} ha</span>
+        </div>
+      </div>
+      <!-- Mois + Prix -->
+      <div class="is-ctrl" style="border-right:none;">
+        <div class="is-ctrl-label">Période <span class="is-mo-limit-label" style="font-weight:400;color:var(--text-muted);">· max ${state.months} mois</span></div>
+        <div class="is-val-row">
+          <span class="is-mo-val">${row.months}</span>
+          <span class="is-unit">mois</span>
+        </div>
+        <div class="range-wrap" style="margin-bottom:4px;">
+          <div class="range-track">
+            <div class="range-fill is-mo-fill" style="background:var(--amber);width:${isMoFillPct(row.months, state.months)}"></div>
+          </div>
+          <input class="is-mo-slider" type="range" min="1" max="${state.months}" value="${row.months}" step="1">
+        </div>
+        <div class="is-mo-ticks">${isMoTicksHtml(state.months)}</div>
+        <!-- Prix — updated dynamically -->
+        <div class="is-price-area is-price-block" style="padding:12px 0 0 0;background:none;">
+          <div class="is-price-label">DDC en cours de saison</div>
+          <div class="is-price-disc">—</div>
+        </div>
+      </div>
+    </div>`;
+  return div;
+}
+
+// Update only the price block of a row (doesn't touch inputs)
+function refreshIsRowPrice(rowEl, row, r) {
+  const rd = r.inSeasonRowData.find(d => d.id === row.id) || { full: 0, disc: 0 };
+  const block = rowEl.querySelector('.is-price-block');
+  const hasPrice = row.ha > 0;
+  block.innerHTML = `
+    <div class="is-price-label">DDC en cours de saison</div>
+    ${hasPrice ? `<div class="is-price-full">${fmtP(rd.full)}</div>` : ''}
+    <div class="is-price-disc">${hasPrice ? fmtP(rd.disc) : '—'}</div>
+    ${hasPrice ? `<div class="is-price-sub">${fmt(row.ha)} ha × ${fmtH(r.perHaAnnual * row.months / 12 / 2)} €/ha · −50 %</div>` : ''}`;
+}
+
+function renderInSeasonRows(r) {
+  const container  = document.getElementById('isRowsContainer');
+  const totalStrip = document.getElementById('isTotalStrip');
+
+  const maxHaSv = haToSlider(state.ha);
+
+  // 1. Add new rows; update maxes + clamp on existing ones
+  state.inSeasonRows.forEach((row, idx) => {
+    let rowEl = document.getElementById('is-row-' + row.id);
+    if (!rowEl) {
+      rowEl = buildIsRowEl(row, idx);
+      container.appendChild(rowEl);
+    } else {
+      rowEl.querySelector('.is-row-num').textContent = `En cours de saison ${idx + 1}`;
+
+      // In % mode: recompute ha from stored pct whenever main surface changes
+      if (row.haMode === 'pct') {
+        row.ha = Math.round((row.pct ?? 0) / 100 * state.ha);
+      }
+
+      // Clamp values to current main limits
+      const clampedHa     = Math.min(row.ha, state.ha);
+      const clampedMonths = Math.min(row.months, state.months);
+      const changed = clampedHa !== row.ha || clampedMonths !== row.months;
+      row.ha     = clampedHa;
+      row.months = clampedMonths;
+
+      // Update ha slider max + value + fill + labels
+      const haSlider = rowEl.querySelector('.is-ha-slider');
+      const sv = row.ha === 0 ? 0 : inSeasonHaToSlider(row.ha, maxHaSv);
+      haSlider.max   = maxHaSv;
+      haSlider.value = sv;
+      rowEl.querySelector('.is-ha-fill').style.width    = isHaFillPct(sv, maxHaSv);
+      rowEl.querySelector('.is-ha-val').textContent     = fmt(row.ha);
+      rowEl.querySelector('.is-ha-km').textContent      = row.ha > 0 ? '· ' + fmt(Math.round(row.ha/100)) + ' km²' : '';
+      rowEl.querySelector('.is-ha-input').max           = state.ha;
+      if (changed || row.haMode === 'pct') rowEl.querySelector('.is-ha-input').value = row.ha;
+      rowEl.querySelector('.is-ha-ticks').innerHTML        = isHaTicksHtml(state.ha, maxHaSv);
+      rowEl.querySelector('.is-limit-label').textContent  = '· max ' + fmt(state.ha) + ' ha';
+      // In % mode: update the computed ha label
+      if (row.haMode === 'pct') {
+        rowEl.querySelector('.is-pct-computed').textContent = '= ' + fmt(row.ha) + ' ha';
+      }
+
+      // Update months slider max + value + fill + labels
+      const moSlider = rowEl.querySelector('.is-mo-slider');
+      moSlider.max   = state.months;
+      moSlider.value = row.months;
+      rowEl.querySelector('.is-mo-fill').style.width      = isMoFillPct(row.months, state.months);
+      rowEl.querySelector('.is-mo-val').textContent       = row.months;
+      rowEl.querySelector('.is-mo-ticks').innerHTML        = isMoTicksHtml(state.months);
+      rowEl.querySelector('.is-mo-limit-label').textContent = '· max ' + state.months + ' mois';
+    }
+    refreshIsRowPrice(rowEl, row, r);
+  });
+
+  // 2. Remove deleted rows
+  Array.from(container.querySelectorAll('.is-row')).forEach(el => {
+    const id = +el.dataset.rowId;
+    if (!state.inSeasonRows.find(row => row.id === id)) el.remove();
+  });
+
+  // 3. Total strip
+  totalStrip.style.display = state.inSeasonRows.length > 0 ? 'flex' : 'none';
+  if (state.inSeasonRows.length > 0)
+    document.getElementById('isTotalVal').textContent = fmtP(r.inSeasonTotal);
+}
+
+// ─── Event delegation for all in-season row inputs ───
+document.getElementById('isRowsContainer').addEventListener('input', function(e) {
+  const rowEl = e.target.closest('.is-row');
+  if (!rowEl) return;
+  const id  = +rowEl.dataset.rowId;
+  const row = state.inSeasonRows.find(r => r.id === id);
+  if (!row) return;
+
+  if (e.target.classList.contains('is-ha-slider')) {
+    const sv    = +e.target.value;
+    const maxSv = +e.target.max;
+    row.ha = sv === 0 ? 0 : (sv === maxSv ? state.ha : Math.min(sliderToHa(sv), state.ha));
+    rowEl.querySelector('.is-ha-fill').style.width = isHaFillPct(sv, maxSv);
+    rowEl.querySelector('.is-ha-val').textContent  = fmt(row.ha);
+    rowEl.querySelector('.is-ha-km').textContent   = row.ha > 0 ? '· ' + fmt(Math.round(row.ha / 100)) + ' km²' : '';
+    rowEl.querySelector('.is-ha-input').value = row.ha;
+  } else if (e.target.classList.contains('is-ha-input')) {
+    const v = Math.min(parseInt(e.target.value, 10) || 0, state.ha);
+    if (v >= 0) {
+      row.ha = v;
+      const maxSv = +rowEl.querySelector('.is-ha-slider').max;
+      const sv = v === 0 ? 0 : inSeasonHaToSlider(v, maxSv);
+      rowEl.querySelector('.is-ha-slider').value     = sv;
+      rowEl.querySelector('.is-ha-fill').style.width = isHaFillPct(sv, maxSv);
+      rowEl.querySelector('.is-ha-val').textContent  = fmt(v);
+      rowEl.querySelector('.is-ha-km').textContent   = v > 0 ? '· ' + fmt(Math.round(v / 100)) + ' km²' : '';
+    }
+  } else if (e.target.classList.contains('is-pct-input')) {
+    const pct = Math.min(Math.max(parseFloat(e.target.value) || 0, 0), 100);
+    row.pct = pct;
+    row.ha  = Math.round(pct / 100 * state.ha);
+    const maxSv = +rowEl.querySelector('.is-ha-slider').max;
+    const sv = row.ha === 0 ? 0 : inSeasonHaToSlider(row.ha, maxSv);
+    rowEl.querySelector('.is-ha-slider').value     = sv;
+    rowEl.querySelector('.is-ha-fill').style.width = isHaFillPct(sv, maxSv);
+    rowEl.querySelector('.is-ha-val').textContent  = fmt(row.ha);
+    rowEl.querySelector('.is-ha-km').textContent   = row.ha > 0 ? '· ' + fmt(Math.round(row.ha / 100)) + ' km²' : '';
+    rowEl.querySelector('.is-ha-input').value      = row.ha;
+    rowEl.querySelector('.is-pct-computed').textContent = '= ' + fmt(row.ha) + ' ha';
+  } else if (e.target.classList.contains('is-mo-slider')) {
+    row.months = +e.target.value;
+    rowEl.querySelector('.is-mo-fill').style.width = isMoFillPct(row.months, state.months);
+    rowEl.querySelector('.is-mo-val').textContent  = row.months;
+  } else {
+    return; // unrelated input
+  }
+
+  // Recompute and refresh only prices — no DOM recreation
+  const r = compute();
+  refreshIsRowPrice(rowEl, row, r);
+  document.getElementById('isTotalStrip').style.display = 'flex';
+  document.getElementById('isTotalVal').textContent = fmtP(r.inSeasonTotal);
+  document.getElementById('grandTotalDisplay').textContent = fmtP(r.grandTotal);
+  renderGC(r);
+});
+
+// Click delegation: delete + ha/% mode toggle
+document.getElementById('isRowsContainer').addEventListener('click', function(e) {
+  // Delete
+  const delBtn = e.target.closest('[data-delete]');
+  if (delBtn) {
+    const id = +delBtn.dataset.delete;
+    state.inSeasonRows = state.inSeasonRows.filter(r => r.id !== id);
+    render();
+    return;
+  }
+
+  // Mode toggle (ha / %)
+  const modeBtn = e.target.closest('.is-mode-btn');
+  if (!modeBtn) return;
+  const rowEl = modeBtn.closest('.is-row');
+  if (!rowEl) return;
+  const id  = +rowEl.dataset.rowId;
+  const row = state.inSeasonRows.find(r => r.id === id);
+  if (!row) return;
+
+  const newMode = modeBtn.classList.contains('is-btn-pct') ? 'pct' : 'ha';
+  if (row.haMode === newMode) return;
+  row.haMode = newMode;
+
+  // Toggle active classes
+  rowEl.querySelector('.is-btn-ha').classList.toggle('active', newMode === 'ha');
+  rowEl.querySelector('.is-btn-pct').classList.toggle('active', newMode === 'pct');
+
+  const haInput   = rowEl.querySelector('.is-ha-input');
+  const pctInput  = rowEl.querySelector('.is-pct-input');
+  const pctLabel  = rowEl.querySelector('.is-pct-computed');
+
+  if (newMode === 'pct') {
+    // Derive % from current ha
+    row.pct = state.ha > 0 ? Math.round(row.ha / state.ha * 100) : 0;
+    pctInput.value = row.pct;
+    pctLabel.textContent = '= ' + fmt(row.ha) + ' ha';
+    haInput.style.display  = 'none';
+    pctInput.style.display = '';
+    pctLabel.style.display = '';
+  } else {
+    haInput.style.display  = '';
+    pctInput.style.display = 'none';
+    pctLabel.style.display = 'none';
+  }
+});
+
+function addInSeasonRow() {
+  const id = ++_isRowId;
+  state.inSeasonRows.push({ id, ha: 10000, months: 6, haMode: 'ha', pct: 50 });
+  render();
+  setTimeout(() => {
+    const el = document.getElementById('is-row-' + id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, 50);
+}
+
+document.getElementById('isAddBtn').addEventListener('click', addInSeasonRow);
+
+document.getElementById('monthsSlider').addEventListener('input', function () {
+  state.months = parseInt(this.value, 10);
+  render();
+});
+
+document.querySelectorAll('.prod[data-key]').forEach(el => {
+  el.addEventListener('click', () => {
+    const k = el.dataset.key;
+    state.prods[k] = !state.prods[k];
+    el.classList.toggle('on', state.prods[k]);
+    render();
+  });
+});
+
+document.getElementById('toggleTerritory').addEventListener('click', function () {
+  state.territory = !state.territory;
+  this.classList.toggle('on', state.territory);
+  render();
+});
+
+document.getElementById('gcToggle').addEventListener('click', () => {
+  document.getElementById('gcSection').classList.toggle('open');
+});
+
+// ═══════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════
+render();
+</script>
+
+</body>
+</html>

@@ -1313,12 +1313,50 @@ createApp({
     const DEPT_STYLE_DARK  = {color:'#444', weight:0.9, opacity:0.50, fill:false};
     const DEPT_STYLE_LIGHT = {color:'#fff', weight:1.1, opacity:0.70, fill:false};
 
-    // Cache partagé pour les données BD ORTHO (chargé une seule fois)
+    // Cache partagé pour les données BD ORTHO (chargé une seule fois par session)
     let _deptOrthoData = null;
+    function invalidateOrthoCache() { _deptOrthoData = null; }
+
+    // Injecte les patterns SVG de hachures (une fois) pour les depts programmés 2026
+    function ensureHatchPatterns(colors) {
+      if(document.getElementById('nimbo-hatch-svg')) return;
+      const ns = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(ns, 'svg');
+      svg.id = 'nimbo-hatch-svg';
+      svg.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;';
+      const defs = document.createElementNS(ns, 'defs');
+      Object.entries(colors).forEach(([year, color]) => {
+        const pat = document.createElementNS(ns, 'pattern');
+        pat.id = `hatch-bdortho-${year}`;
+        pat.setAttribute('patternUnits', 'userSpaceOnUse');
+        pat.setAttribute('width', '8'); pat.setAttribute('height', '8');
+        pat.setAttribute('patternTransform', 'rotate(45)');
+        const rect = document.createElementNS(ns, 'rect');
+        rect.setAttribute('width', '8'); rect.setAttribute('height', '8');
+        rect.setAttribute('fill', color); rect.setAttribute('opacity', '0.55');
+        const line = document.createElementNS(ns, 'line');
+        line.setAttribute('x1','0'); line.setAttribute('y1','0');
+        line.setAttribute('x2','0'); line.setAttribute('y2','8');
+        line.setAttribute('stroke', 'rgba(255,255,255,0.75)');
+        line.setAttribute('stroke-width', '3');
+        pat.appendChild(rect); pat.appendChild(line);
+        defs.appendChild(pat);
+      });
+      svg.appendChild(defs);
+      document.body.appendChild(svg);
+    }
 
     // Ajoute un overlay choroplèthe BD ORTHO (millésimes) à un contrôle de couches Leaflet
     async function addOrthoMillesimeOverlay(mapInst, layerCtrl) {
-      const COLORS = {2025:'#52b788', 2024:'#e9c46a', 2023:'#457b9d', 2022:'#e63946'};
+      const COLORS = {2026:'#2d6a4f', 2025:'#52b788', 2024:'#e9c46a', 2023:'#457b9d', 2022:'#e63946'};
+      const PROG_LABEL = {
+        'aerien':'Programme aérien 20cm', 'pleiades':'Programme Pléiades Néo 30cm', 'non_programme':'Non programmé'
+      };
+      const STATUT_LABEL = {
+        'disponible_final':'Ortho finale disponible','termine':'Acquisition terminée',
+        'en_cours':'Acquisition en cours','programme':'Programmé 2026','non_programme':'Non programmé'
+      };
+      ensureHatchPatterns(COLORS);
       try {
         if(!_deptOrthoData) {
           const { data } = await supabaseClient.from('dept_ortho_disponibilites').select('*');
@@ -1332,15 +1370,20 @@ createApp({
         const layer = L.geoJSON(gj, {
           style: feat => {
             const d = orthoMap[feat.properties.code];
-            const col = d ? (COLORS[d.millesime_bdortho] || '#bbb') : '#bbb';
-            return {fillColor:col, fillOpacity:0.55, color:'#fff', weight:1, opacity:0.8};
+            const mil = d?.millesime_bdortho;
+            const baseCol = d ? (COLORS[mil] || '#bbb') : '#bbb';
+            const isProg = d?.statut_2026 === 'programme';
+            return isProg
+              ? {fillColor:`url(#hatch-bdortho-${mil})`, fillOpacity:1, color:'#aaa', weight:1, opacity:0.7}
+              : {fillColor:baseCol, fillOpacity:0.55, color:'#fff', weight:1, opacity:0.8};
           },
           onEachFeature: (feat, lyr) => {
             const d = orthoMap[feat.properties.code];
             if(d) lyr.bindPopup(
               `<strong>${d.nom_dept} (${d.code_dept})</strong><br>Millésime BD ORTHO : <b>${d.millesime_bdortho}</b>` +
-              (d.programme_2026 ? `<br>Programme 2026 : ${d.programme_2026}` : '') +
-              (d.statut_2026 ? ` (${d.statut_2026})` : '')
+              (d.programme_2026 && d.programme_2026 !== 'non_programme'
+                ? `<br>2026 : ${PROG_LABEL[d.programme_2026]||d.programme_2026} — ${STATUT_LABEL[d.statut_2026]||d.statut_2026}`
+                : (d.statut_2026 === 'non_programme' ? '<br>2026 : Non programmé' : ''))
             );
           }
         });
@@ -1349,8 +1392,15 @@ createApp({
         legend.onAdd = () => {
           const div = L.DomUtil.create('div');
           div.style.cssText = 'background:rgba(255,255,255,0.92);padding:8px 12px;border-radius:4px;font-size:12px;line-height:1.9;box-shadow:0 1px 5px rgba(0,0,0,.3);';
+          const hatchSwatch = y => {
+            const c = COLORS[y];
+            return `<span style="display:inline-block;width:14px;height:14px;vertical-align:middle;margin-right:3px;`+
+              `background:repeating-linear-gradient(45deg,${c} 0px,${c} 3px,rgba(255,255,255,0.8) 3px,rgba(255,255,255,0.8) 6px);border-radius:2px"></span>`;
+          };
           div.innerHTML = '<strong style="font-size:11px;display:block;margin-bottom:3px">BD ORTHO millésime</strong>' +
-            [2025,2024,2023,2022].map(y=>`<span style="color:${COLORS[y]};font-size:15px">■</span> ${y}`).join('<br>');
+            [2026,2025,2024,2023,2022].map(y=>`<span style="color:${COLORS[y]};font-size:15px">■</span> ${y}`).join('<br>') +
+            '<hr style="margin:5px 0;border-color:#ddd">' +
+            hatchSwatch(2022) + '<span style="color:#666">Programmé 2026</span>';
           return div;
         };
 

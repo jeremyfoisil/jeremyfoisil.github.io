@@ -1001,7 +1001,9 @@ createApp({
     const annConsolKm   = ref(5);
 
     // ── Projection : nouveaux projets par année (year→count) ────────────────
-    const projPerYear = reactive({});          // ex: {2027: 2, 2028: 5, ...}
+    const projPerYear = reactive(Object.fromEntries(
+      Array.from({length: 31}, (_, i) => [2020 + i, 0])
+    ));  // toutes les années initialisées à 0
     function getProjPerYear(y) { return projPerYear[y] || 0; }
     let _projSaveTimer = null;
     function setProjPerYear(y, v) {

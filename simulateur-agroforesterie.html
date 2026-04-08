@@ -1116,13 +1116,15 @@ createApp({
 
     // ── Shapefile tab pricing ─────────────────────────────────────────────────
     const shpInitCost  = computed(() => shpNewOnes.value.reduce((s,p)=>s+computeShpPrice(p.haiesCount,p.totalLengthM,pp.value),0) * ewMult.value * degMult(shpProjects.value.length));
-    const shpSuiviCost = computed(() => shpExOnes.value.reduce((s,p)=>s+computeShpPrice(p.haiesCount,p.totalLengthM,pp.value),0) * 0.5 * ewMult.value * degMult(shpProjects.value.length));
+    const shpSuiviCost = computed(() => shpExOnes.value.reduce((s,p)=>s+computeShpPrice(p.haiesCount,p.totalLengthM,pp.value) * 0.5 * ewMult.value * degMult(totalAtYear(p.annee)),0));
     const shpTotalHT   = computed(() => sub.value+shpInitCost.value+shpSuiviCost.value);
 
     function shpProjAnnCost(p) {
       const price = computeShpPrice(p.haiesCount,p.totalLengthM,pp.value);
-      const m = ewMult.value * degMult(shpProjects.value.length);
-      return p.isNew ? price * m : price * 0.5 * m;
+      // Init : degMult du total actuel ; Suivi : degMult de l'année d'init du projet
+      if (p.isNew) return price * ewMult.value * degMult(shpProjects.value.length);
+      const initM = ewMult.value * degMult(totalAtYear(p.annee));
+      return price * 0.5 * initM;
     }
 
     // ── Year-filtered computed values ─────────────────────────────────────────
@@ -1153,7 +1155,7 @@ createApp({
       yearNewOnes.value.reduce((s, p) => s + computeShpPrice(p.haiesCount, p.totalLengthM, pp.value), 0) * ewMult.value * degMult(yearVisibleProjects.value.length)
     );
     const shpSuiviCostYear = computed(() =>
-      yearSuiviOnes.value.reduce((s, p) => s + computeShpPrice(p.haiesCount, p.totalLengthM, pp.value), 0) * 0.5 * ewMult.value * degMult(yearVisibleProjects.value.length)
+      yearSuiviOnes.value.reduce((s, p) => s + computeShpPrice(p.haiesCount, p.totalLengthM, pp.value) * 0.5 * ewMult.value * degMult(totalAtYear(p.annee)), 0)
     );
     const shpTotalHTYear = computed(() => {
       const hasActivity = yearNewOnes.value.length > 0 || yearSuiviOnes.value.length > 0;
@@ -1192,6 +1194,17 @@ createApp({
 
       const forecasts = []; // { annee, price } — projets simulés
       const rows = [];
+      const totalByYear = {}; // year → total projets cumulés (pour degMult au moment de l'init)
+      const ew = ewMult.value;
+
+      // Premier passage : calculer le total cumulé par année
+      const forecastsPreCalc = [];
+      for (const year of ALL_YEARS) {
+        const nNew = getProjPerYear(year);
+        for (let j = 0; j < nNew; j++) forecastsPreCalc.push(year);
+        totalByYear[year] = shpProjects.value.filter(p => p.annee <= year).length
+                          + forecastsPreCalc.filter(y => y <= year).length;
+      }
 
       for (const year of ALL_YEARS) {
         // Les forecasts s'accumulent pour toute année ayant des projets projetés
@@ -1210,14 +1223,22 @@ createApp({
           ? forecasts.filter(p => p.annee < year)
           : forecasts.filter(p => p.annee < year && (year - p.annee) % 3 === 0);
 
-        const total    = shpProjects.value.filter(p => p.annee <= year).length
-                       + forecasts.filter(p => p.annee <= year).length;
+        const total = totalByYear[year];
 
-        const ew = ewMult.value, dm = degMult(total);
+        // Init : multiplicateurs de l'année courante
+        const dm = degMult(total);
         const initCost  = (realInit.reduce((s, p) => s + computeShpPrice(p.haiesCount, p.totalLengthM, pp.value), 0)
                         + fInit.reduce((s, p) => s + p.price, 0)) * ew * dm;
-        const suiviCost = (realSuivi.reduce((s, p) => s + computeShpPrice(p.haiesCount, p.totalLengthM, pp.value), 0)
-                        + fSuivi.reduce((s, p) => s + p.price, 0)) * 0.5 * ew * dm;
+
+        // Suivi : chaque projet utilise le degMult de SON année d'init → suivi = 50% du coût d'init exact
+        const suiviCost = realSuivi.reduce((s, p) => {
+                            const initDm = degMult(totalByYear[p.annee] || 0);
+                            return s + computeShpPrice(p.haiesCount, p.totalLengthM, pp.value) * 0.5 * ew * initDm;
+                          }, 0)
+                        + fSuivi.reduce((s, p) => {
+                            const initDm = degMult(totalByYear[p.annee] || 0);
+                            return s + p.price * 0.5 * ew * initDm;
+                          }, 0);
         const realNewCount = realInit.length;
         const forecastNew  = fInit.length;
         const newCount = realNewCount + forecastNew;
@@ -1290,7 +1311,7 @@ createApp({
       const annTotalProj = shpProjects.value.filter(p => p.annee <= annYear.value).length;
       const annM = ewMult.value * degMult(annTotalProj);
       const initCost =yearNewOnes.value.reduce((s,p)=>s+computeShpPrice(p.haiesCount,p.totalLengthM,pp.value),0) * annM;
-      const suiviCost=yearSuiviOnes.value.reduce((s,p)=>s+computeShpPrice(p.haiesCount,p.totalLengthM,pp.value),0) * 0.5 * annM;
+      const suiviCost=yearSuiviOnes.value.reduce((s,p)=>s+computeShpPrice(p.haiesCount,p.totalLengthM,pp.value) * 0.5 * ewMult.value * degMult(totalAtYear(p.annee)),0);
       const hasActivity=yearNewOnes.value.length>0||yearSuiviOnes.value.length>0;
       const totalHT=(hasActivity?sub.value:0)+initCost+suiviCost+pleiCost;
       return {initCost,suiviCost,pleiCost,pleiArea,pleiAreaInd,pleiAreaCons,
@@ -1307,9 +1328,12 @@ createApp({
     }
     function annProjMonCost(p) {
       const price=computeShpPrice(p.haiesCount,p.totalLengthM,pp.value);
-      const nProj=shpProjects.value.filter(x=>x.annee<=annYear.value).length;
-      const m=ewMult.value*degMult(nProj);
-      return p.isNew?price*m:price*0.5*m;
+      if (p.isNew) {
+        const nProj=shpProjects.value.filter(x=>x.annee<=annYear.value).length;
+        return price*ewMult.value*degMult(nProj);
+      }
+      const initM=ewMult.value*degMult(totalAtYear(p.annee));
+      return price*0.5*initM;
     }
 
     function fmtKm2Compare(raw,eff) {
@@ -1648,6 +1672,8 @@ createApp({
       return m;
     });
     function yearInitCountFor(y)  { return projRowsByYear.value[y]?.newCount || 0; }
+    // Total projets cumulés à une année donnée (pour retrouver le degMult au moment de l'init)
+    function totalAtYear(y) { return projRowsByYear.value[y]?.total || shpProjects.value.filter(p => p.annee <= y).length; }
     function yearSuiviCountFor(y) { return projRowsByYear.value[y]?.exCount  || 0; }
     // Ligne de projection pour l'année sélectionnée (agrège réel + forecast)
     const curYearRow = computed(() => projRowsByYear.value[shpYear.value] || {
@@ -1680,12 +1706,17 @@ createApp({
 
     function projYearCostText(p) {
       const price=computeShpPrice(p.haiesCount,p.totalLengthM,pp.value);
-      const m=ewMult.value*degMult(curYearRow.value.total);
-      if(p.annee===shpYear.value) return fmt(price*m);
+      if(p.annee===shpYear.value) {
+        const m=ewMult.value*degMult(curYearRow.value.total);
+        return fmt(price*m);
+      }
       if(p.annee<shpYear.value) {
         const isInSuivi = suiviMode.value === 'annuel' ? true : isSuiviYear(p, shpYear.value);
-        return isInSuivi ? fmt(price*0.5*m) : '—';
+        // Suivi = 50% du coût d'init, avec le degMult de l'année d'init du projet
+        const initM=ewMult.value*degMult(totalAtYear(p.annee));
+        return isInSuivi ? fmt(price*0.5*initM) : '—';
       }
+      const m=ewMult.value*degMult(curYearRow.value.total);
       return fmt(price*m);
     }
 
@@ -1954,8 +1985,7 @@ createApp({
       if(exOnes.length){
         const sCtx=getCtx('shp-bar-suivi');
         if(sCtx){
-          const sm=ewMult.value*degMult(shpProjects.value.length);
-          const sData=exOnes.map(p=>Math.round(computeShpPrice(p.haiesCount,p.totalLengthM,pp.value)*0.5*sm));
+          const sData=exOnes.map(p=>Math.round(computeShpPrice(p.haiesCount,p.totalLengthM,pp.value)*0.5*ewMult.value*degMult(totalAtYear(p.annee))));
           const sLabels=exOnes.map(p=>p.name), sColors=exOnes.map(p=>p.color);
           if(shpSuiviInst){shpSuiviInst.data.labels=sLabels;shpSuiviInst.data.datasets[0].data=sData;shpSuiviInst.data.datasets[0].backgroundColor=sColors;shpSuiviInst.update();}
           else {

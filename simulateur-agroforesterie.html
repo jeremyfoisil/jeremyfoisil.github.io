@@ -237,7 +237,7 @@ footer{text-align:center;padding:16px;font-size:11px;color:var(--gray-600);margi
       <button class="sp-close" @click="settingsOpen = false">×</button>
     </div>
     <div class="sp-body">
-      <div class="sec-div">Abonnement plateforme</div>
+      <div class="sec-div">Abonnement au service</div>
       <div class="fgroup">
         <div class="flabel"><span>Abonnement annuel (€ HT)</span></div>
         <div class="irow"><input type="number" min="500" max="20000" step="100" v-model.number="sub" style="width:90px"><span>€/an</span></div>
@@ -534,35 +534,35 @@ footer{text-align:center;padding:16px;font-size:11px;color:var(--gray-600);margi
               <div v-show="suiviMode==='triennal'">
                 <div class="mc hl" style="border-radius:var(--r-sm);padding:13px 15px;margin-bottom:16px">
                   <div class="mc-label">Total annuel HT</div>
-                  <div class="mc-val">{{ fmt(shpTotalHTYear) }}</div>
-                  <div class="mc-sub">{{ yearVisibleProjects.length }} projet{{ yearVisibleProjects.length > 1 ? 's' : '' }} · {{ shpYear }}</div>
-                  <div style="font-size:11px;color:rgba(255,255,255,.75);margin-top:3px">{{ shpYear }} — {{ yearNewOnes.length }} init. · {{ yearSuiviOnes.length }} suivi</div>
+                  <div class="mc-val">{{ fmt(curYearRow.totalHT) }}</div>
+                  <div class="mc-sub">{{ curYearRow.total }} projet{{ curYearRow.total > 1 ? 's' : '' }} · {{ shpYear }}</div>
+                  <div style="font-size:11px;color:rgba(255,255,255,.75);margin-top:3px">{{ shpYear }} — {{ curYearRow.newCount }} init. · {{ curYearRow.exCount }} suivi</div>
                 </div>
                 <div class="brow">
-                  <span class="blabel">Abonnement plateforme</span>
-                  <span class="bamount" :style="{color: yearNewOnes.length === 0 && yearSuiviOnes.length === 0 ? 'var(--gray-200)' : ''}">
-                    {{ yearNewOnes.length === 0 && yearSuiviOnes.length === 0 ? '— (aucune activité)' : fmt(sub) }}
+                  <span class="blabel">Abonnement au service</span>
+                  <span class="bamount" :style="{color: curYearRow.newCount === 0 && curYearRow.exCount === 0 ? 'var(--gray-200)' : ''}">
+                    {{ curYearRow.newCount === 0 && curYearRow.exCount === 0 ? '— (aucune activité)' : fmt(sub) }}
                   </span>
                 </div>
                 <div class="brow">
-                  <span class="blabel">Nouveaux projets<small v-if="yearNewOnes.length"> — {{ yearNewOnes.length }} projet{{ yearNewOnes.length > 1 ? 's' : '' }}</small></span>
-                  <span class="bamount">{{ fmt(shpInitCostYear) }}</span>
+                  <span class="blabel">Nouveaux projets<small v-if="curYearRow.newCount"> — {{ curYearRow.newCount }} projet{{ curYearRow.newCount > 1 ? 's' : '' }}</small></span>
+                  <span class="bamount">{{ fmt(curYearRow.initCost) }}</span>
                 </div>
                 <div class="brow">
-                  <span class="blabel">En suivi (−50 %)<small v-if="yearSuiviOnes.length"> — {{ yearSuiviOnes.length }} projet{{ yearSuiviOnes.length > 1 ? 's' : '' }}</small></span>
-                  <span class="bamount">{{ fmt(shpSuiviCostYear) }}</span>
+                  <span class="blabel">En suivi (−50 %)<small v-if="curYearRow.exCount"> — {{ curYearRow.exCount }} projet{{ curYearRow.exCount > 1 ? 's' : '' }}</small></span>
+                  <span class="bamount">{{ fmt(curYearRow.suiviCost) }}</span>
                 </div>
                 <div class="brow total">
                   <span class="blabel">Total HT</span>
-                  <span class="bamount">{{ fmt(shpTotalHTYear) }}</span>
+                  <span class="bamount">{{ fmt(curYearRow.totalHT) }}</span>
                 </div>
                 <div class="brow sub-line">
                   <span class="blabel">TVA 20 %</span>
-                  <span class="bamount">{{ fmt(shpTotalHTYear * 0.2) }}</span>
+                  <span class="bamount">{{ fmt(curYearRow.totalHT * 0.2) }}</span>
                 </div>
                 <div class="brow sub-line" style="padding-bottom:10px">
                   <span class="blabel" style="font-size:13px;font-weight:600;color:var(--gray-800)">Total TTC</span>
-                  <span class="bamount" style="font-size:15px">{{ fmt(shpTotalHTYear * 1.2) }}</span>
+                  <span class="bamount" style="font-size:15px">{{ fmt(curYearRow.totalHT * 1.2) }}</span>
                 </div>
                 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray-600);margin:14px 0 6px">Structure du coût global</div>
                 <div class="chart-wrap" style="height:160px"><canvas id="shp-donut-chart"></canvas></div>
@@ -581,8 +581,8 @@ footer{text-align:center;padding:16px;font-size:11px;color:var(--gray-600);margi
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
                   <div class="mc hl">
                     <div class="mc-label">Total annuel HT</div>
-                    <div class="mc-val">{{ fmt(annPricing.totalHT) }}</div>
-                    <div class="mc-sub">{{ annYearProjects.length }} projet{{ annYearProjects.length > 1 ? 's' : '' }} actifs · {{ shpYear }}</div>
+                    <div class="mc-val">{{ fmt(curYearRow.totalHT) }}</div>
+                    <div class="mc-sub">{{ curYearRow.total }} projet{{ curYearRow.total > 1 ? 's' : '' }} cumulés · {{ shpYear }}</div>
                   </div>
                   <div class="mc">
                     <div class="mc-label">AOIs optimisés</div>
@@ -591,16 +591,18 @@ footer{text-align:center;padding:16px;font-size:11px;color:var(--gray-600);margi
                   </div>
                 </div>
                 <div class="brow">
-                  <span class="blabel">Abonnement plateforme</span>
-                  <span class="bamount">{{ fmt(sub) }}</span>
+                  <span class="blabel">Abonnement au service</span>
+                  <span class="bamount" :style="{color: curYearRow.newCount === 0 && curYearRow.exCount === 0 ? 'var(--gray-200)' : ''}">
+                    {{ curYearRow.newCount === 0 && curYearRow.exCount === 0 ? '— (aucune activité)' : fmt(sub) }}
+                  </span>
                 </div>
                 <div class="brow">
-                  <span class="blabel">Monitoring — nouveaux projets<small v-if="yearNewOnes.length"> — {{ yearNewOnes.length }} projet{{ yearNewOnes.length > 1 ? 's' : '' }}</small></span>
-                  <span class="bamount">{{ fmt(annPricing.initCost) }}</span>
+                  <span class="blabel">Monitoring — nouveaux projets<small v-if="curYearRow.newCount"> — {{ curYearRow.newCount }} projet{{ curYearRow.newCount > 1 ? 's' : '' }}</small></span>
+                  <span class="bamount">{{ fmt(curYearRow.initCost) }}</span>
                 </div>
                 <div class="brow">
-                  <span class="blabel">Monitoring — en suivi (−50 %)<small v-if="yearSuiviOnes.length"> — {{ yearSuiviOnes.length }} projet{{ yearSuiviOnes.length > 1 ? 's' : '' }}</small></span>
-                  <span class="bamount">{{ fmt(annPricing.suiviCost) }}</span>
+                  <span class="blabel">Monitoring — en suivi (−50 %)<small v-if="curYearRow.exCount"> — {{ curYearRow.exCount }} projet{{ curYearRow.exCount > 1 ? 's' : '' }}</small></span>
+                  <span class="bamount">{{ fmt(curYearRow.suiviCost) }}</span>
                 </div>
                 <div class="brow" style="border-top:1px solid var(--gray-200);padding-top:8px;margin-top:4px">
                   <span class="blabel" style="color:var(--blue)">Acquisition Pléiades<small> — {{ annPricing.pleiArea.toLocaleString('fr-FR', {maximumFractionDigits:2}) }} km² × {{ annEffRate }} €/km²</small></span>
@@ -627,15 +629,15 @@ footer{text-align:center;padding:16px;font-size:11px;color:var(--gray-600);margi
                 </div>
                 <div class="brow total">
                   <span class="blabel">Total HT</span>
-                  <span class="bamount">{{ fmt(annPricing.totalHT) }}</span>
+                  <span class="bamount">{{ fmt(curYearRow.totalHT) }}</span>
                 </div>
                 <div class="brow sub-line">
                   <span class="blabel">TVA 20 %</span>
-                  <span class="bamount">{{ fmt(annPricing.tva) }}</span>
+                  <span class="bamount">{{ fmt(curYearRow.totalHT * 0.2) }}</span>
                 </div>
                 <div class="brow sub-line" style="padding-bottom:10px">
                   <span class="blabel" style="font-size:13px;font-weight:600;color:var(--gray-800)">Total TTC</span>
-                  <span class="bamount" style="font-size:15px">{{ fmt(annPricing.ttc) }}</span>
+                  <span class="bamount" style="font-size:15px">{{ fmt(curYearRow.totalHT * 1.2) }}</span>
                 </div>
                 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray-600);margin:14px 0 6px">Structure du coût global</div>
                 <div class="chart-wrap" style="height:160px"><canvas id="ann-donut-chart"></canvas></div>
@@ -1596,6 +1598,10 @@ createApp({
     });
     function yearInitCountFor(y)  { return projRowsByYear.value[y]?.newCount || 0; }
     function yearSuiviCountFor(y) { return projRowsByYear.value[y]?.exCount  || 0; }
+    // Ligne de projection pour l'année sélectionnée (agrège réel + forecast)
+    const curYearRow = computed(() => projRowsByYear.value[shpYear.value] || {
+      newCount:0, exCount:0, total:0, initCost:0, suiviCost:0, pleiCost:0, totalHT:0
+    });
 
     // ── Project card status helpers (driven by shpYear) ───────────────────────
     function projStatusLabel(p) {
@@ -2158,7 +2164,7 @@ createApp({
       shpInitCost, shpSuiviCost, shpTotalHT,
       yearNewOnes, yearSuiviOnes, yearVisibleProjects,
       shpInitCostYear, shpSuiviCostYear, shpTotalHTYear,
-      projectionRows,
+      projectionRows, curYearRow,
       annProjectAOIs, annConsolidation, annTotalAOIs, annHasArea, annPricing,
       annYearProjects, annProjectAOIsYear, annConsolidationYear, annTotalAOIsYear, annHasAreaYear,
       // Methods

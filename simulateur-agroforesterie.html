@@ -293,6 +293,39 @@ footer{text-align:center;padding:16px;font-size:11px;color:var(--gray-600);margi
         <input type="range" min="0" max="50" step="1" v-model.number="ewMargin">
         <div class="irow"><input type="number" min="0" max="50" step="1" v-model.number="ewMargin" style="width:65px"><span>% sur initialisation</span></div>
       </div>
+
+      <div class="sec-div" style="margin-top:18px">Dégressivité — Initialisation</div>
+      <div style="font-size:11px;color:var(--gray-600);margin-bottom:6px">Remise appliquée sur le prix d'initialisation selon le nombre total de projets cumulés.</div>
+      <div class="fgroup">
+        <div class="flabel"><span>Palier 1</span></div>
+        <div class="irow">
+          <span>À partir de</span>
+          <input type="number" min="1" max="100" step="1" v-model.number="degSeuil1" style="width:55px">
+          <span>projets →</span>
+          <input type="number" min="0" max="50" step="1" v-model.number="degRemise1" style="width:55px">
+          <span>% de remise</span>
+        </div>
+      </div>
+      <div class="fgroup">
+        <div class="flabel"><span>Palier 2</span></div>
+        <div class="irow">
+          <span>À partir de</span>
+          <input type="number" min="1" max="100" step="1" v-model.number="degSeuil2" style="width:55px">
+          <span>projets →</span>
+          <input type="number" min="0" max="50" step="1" v-model.number="degRemise2" style="width:55px">
+          <span>% de remise</span>
+        </div>
+      </div>
+      <div class="fgroup">
+        <div class="flabel"><span>Palier 3</span></div>
+        <div class="irow">
+          <span>À partir de</span>
+          <input type="number" min="1" max="100" step="1" v-model.number="degSeuil3" style="width:55px">
+          <span>projets →</span>
+          <input type="number" min="0" max="50" step="1" v-model.number="degRemise3" style="width:55px">
+          <span>% de remise</span>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -944,6 +977,14 @@ createApp({
     const priceFloor= ref(100);
     const ewMargin  = ref(15); // Marge Earthworm (%) — appliquée sur l'initialisation uniquement
 
+    // ── Dégressivité par paliers (init uniquement) ────────────────────────────
+    const degSeuil1  = ref(3);   // à partir de N projets cumulés
+    const degRemise1 = ref(5);   // remise %
+    const degSeuil2  = ref(6);
+    const degRemise2 = ref(10);
+    const degSeuil3  = ref(10);
+    const degRemise3 = ref(15);
+
     // ── Annual tab params ─────────────────────────────────────────────────────
     const annDifficulty = ref('easy');
     const annRate       = ref(35);
@@ -1018,6 +1059,14 @@ createApp({
     const annEffRate = computed(() => annRate.value + (annCloud.value ? 9 : 0));
     const ewMult    = computed(() => 1 + ewMargin.value / 100); // multiplicateur marge Earthworm
 
+    // Dégressivité : retourne le multiplicateur (ex: 0.90 = -10%) selon le nombre total de projets
+    function degMult(totalProjects) {
+      if (degSeuil3.value > 0 && totalProjects >= degSeuil3.value) return 1 - degRemise3.value / 100;
+      if (degSeuil2.value > 0 && totalProjects >= degSeuil2.value) return 1 - degRemise2.value / 100;
+      if (degSeuil1.value > 0 && totalProjects >= degSeuil1.value) return 1 - degRemise1.value / 100;
+      return 1;
+    }
+
     // ── Project group helpers ─────────────────────────────────────────────────
     const shpNewOnes = computed(() => shpProjects.value.filter(p=>p.isNew));
     const shpExOnes  = computed(() => shpProjects.value.filter(p=>!p.isNew));
@@ -1025,13 +1074,13 @@ createApp({
     const shpTotalLen   = computed(() => shpProjects.value.reduce((s,p)=>s+p.totalLengthM,0));
 
     // ── Shapefile tab pricing ─────────────────────────────────────────────────
-    const shpInitCost  = computed(() => shpNewOnes.value.reduce((s,p)=>s+computeShpPrice(p.haiesCount,p.totalLengthM,pp.value),0) * ewMult.value);
+    const shpInitCost  = computed(() => shpNewOnes.value.reduce((s,p)=>s+computeShpPrice(p.haiesCount,p.totalLengthM,pp.value),0) * ewMult.value * degMult(shpProjects.value.length));
     const shpSuiviCost = computed(() => shpExOnes.value.reduce((s,p)=>s+computeShpPrice(p.haiesCount,p.totalLengthM,pp.value)*0.5,0));
     const shpTotalHT   = computed(() => sub.value+shpInitCost.value+shpSuiviCost.value);
 
     function shpProjAnnCost(p) {
       const price = computeShpPrice(p.haiesCount,p.totalLengthM,pp.value);
-      return p.isNew ? price * ewMult.value : price*0.5;
+      return p.isNew ? price * ewMult.value * degMult(shpProjects.value.length) : price*0.5;
     }
 
     // ── Year-filtered computed values ─────────────────────────────────────────
@@ -1059,7 +1108,7 @@ createApp({
 
     // Year-filtered costs (actual billing for selected year, not amortized)
     const shpInitCostYear = computed(() =>
-      yearNewOnes.value.reduce((s, p) => s + computeShpPrice(p.haiesCount, p.totalLengthM, pp.value), 0) * ewMult.value
+      yearNewOnes.value.reduce((s, p) => s + computeShpPrice(p.haiesCount, p.totalLengthM, pp.value), 0) * ewMult.value * degMult(yearVisibleProjects.value.length)
     );
     const shpSuiviCostYear = computed(() =>
       yearSuiviOnes.value.reduce((s, p) => s + computeShpPrice(p.haiesCount, p.totalLengthM, pp.value) * 0.5, 0)
@@ -1103,13 +1152,13 @@ createApp({
           ? forecasts.filter(p => p.annee < year)
           : forecasts.filter(p => p.annee < year && (year - p.annee) % 3 === 0);
 
-        const initCost  = (realInit.reduce((s, p) => s + computeShpPrice(p.haiesCount, p.totalLengthM, pp.value), 0)
-                        + fInit.reduce((s, p) => s + p.price, 0)) * ewMult.value;
-        const suiviCost = realSuivi.reduce((s, p) => s + computeShpPrice(p.haiesCount, p.totalLengthM, pp.value) * 0.5, 0)
-                        + fSuivi.reduce((s, p) => s + p.price * 0.5, 0);
-
         const total    = shpProjects.value.filter(p => p.annee <= year).length
                        + forecasts.filter(p => p.annee <= year).length;
+
+        const initCost  = (realInit.reduce((s, p) => s + computeShpPrice(p.haiesCount, p.totalLengthM, pp.value), 0)
+                        + fInit.reduce((s, p) => s + p.price, 0)) * ewMult.value * degMult(total);
+        const suiviCost = realSuivi.reduce((s, p) => s + computeShpPrice(p.haiesCount, p.totalLengthM, pp.value) * 0.5, 0)
+                        + fSuivi.reduce((s, p) => s + p.price * 0.5, 0);
         const newCount = realInit.length + fInit.length;
         const exCount  = realSuivi.length + fSuivi.length;
         const hasActivity = newCount > 0 || exCount > 0;
@@ -1171,7 +1220,8 @@ createApp({
       const pleiCost=Math.min(pleiCostInd,pleiCostCons);
       const pleiArea=pleiCost===pleiCostCons?pleiAreaCons:pleiAreaInd;
       // Coûts monitoring filtrés par année (init et suivi N+3)
-      const initCost =yearNewOnes.value.reduce((s,p)=>s+computeShpPrice(p.haiesCount,p.totalLengthM,pp.value),0) * ewMult.value;
+      const annTotalProj = shpProjects.value.filter(p => p.annee <= annYear.value).length;
+      const initCost =yearNewOnes.value.reduce((s,p)=>s+computeShpPrice(p.haiesCount,p.totalLengthM,pp.value),0) * ewMult.value * degMult(annTotalProj);
       const suiviCost=yearSuiviOnes.value.reduce((s,p)=>s+computeShpPrice(p.haiesCount,p.totalLengthM,pp.value)*0.5,0);
       const hasActivity=yearNewOnes.value.length>0||yearSuiviOnes.value.length>0;
       const totalHT=(hasActivity?sub.value:0)+initCost+suiviCost+pleiCost;
@@ -1189,7 +1239,8 @@ createApp({
     }
     function annProjMonCost(p) {
       const price=computeShpPrice(p.haiesCount,p.totalLengthM,pp.value);
-      return p.isNew?price*ewMult.value:price*0.5;
+      const nProj=shpProjects.value.filter(x=>x.annee<=annYear.value).length;
+      return p.isNew?price*ewMult.value*degMult(nProj):price*0.5;
     }
 
     function fmtKm2Compare(raw,eff) {
@@ -1550,9 +1601,10 @@ createApp({
 
     function projYearCostText(p) {
       const price=computeShpPrice(p.haiesCount,p.totalLengthM,pp.value);
-      if(p.annee===shpYear.value) return fmt(price*ewMult.value);
+      const dm=degMult(yearVisibleProjects.value.length);
+      if(p.annee===shpYear.value) return fmt(price*ewMult.value*dm);
       if(p.annee<shpYear.value) return isSuiviYear(p,shpYear.value) ? fmt(price*0.5) : '—';
-      return fmt(price*ewMult.value);
+      return fmt(price*ewMult.value*dm);
     }
 
     function updateAnnMap() {
@@ -1800,7 +1852,8 @@ createApp({
       if(newOnes.length){
         const iCtx=getCtx('shp-bar-init');
         if(iCtx){
-          const iData=newOnes.map(p=>Math.round(computeShpPrice(p.haiesCount,p.totalLengthM,pp.value)*ewMult.value));
+          const dm=degMult(shpProjects.value.length);
+          const iData=newOnes.map(p=>Math.round(computeShpPrice(p.haiesCount,p.totalLengthM,pp.value)*ewMult.value*dm));
           const iLabels=newOnes.map(p=>p.name), iColors=newOnes.map(p=>p.color);
           if(shpInitInst){shpInitInst.data.labels=iLabels;shpInitInst.data.datasets[0].data=iData;shpInitInst.data.datasets[0].backgroundColor=iColors;shpInitInst.update();}
           else {
@@ -2001,6 +2054,12 @@ createApp({
       annClusterM.value = data.ann_cluster_m;
       annConsolKm.value = data.ann_consol_km;
       projPerYr.value   = data.proj_per_yr;
+      if (data.deg_seuil1  != null) degSeuil1.value  = data.deg_seuil1;
+      if (data.deg_remise1 != null) degRemise1.value = data.deg_remise1;
+      if (data.deg_seuil2  != null) degSeuil2.value  = data.deg_seuil2;
+      if (data.deg_remise2 != null) degRemise2.value = data.deg_remise2;
+      if (data.deg_seuil3  != null) degSeuil3.value  = data.deg_seuil3;
+      if (data.deg_remise3 != null) degRemise3.value = data.deg_remise3;
     }
 
     async function savePricingToDB() {
@@ -2024,6 +2083,12 @@ createApp({
         ann_cluster_m: annClusterM.value,
         ann_consol_km: annConsolKm.value,
         proj_per_yr:   projPerYr.value,
+        deg_seuil1:    degSeuil1.value,
+        deg_remise1:   degRemise1.value,
+        deg_seuil2:    degSeuil2.value,
+        deg_remise2:   degRemise2.value,
+        deg_seuil3:    degSeuil3.value,
+        deg_remise3:   degRemise3.value,
         updated_at:    new Date().toISOString()
       });
     }
@@ -2037,7 +2102,9 @@ createApp({
 
     watch(
       [sub, shpBase, shpScale, shpWH, shpMaxH, shpMaxML, shpProg,
-       initRate, priceFloor, ewMargin, annDifficulty, annRate, annCloud,
+       initRate, priceFloor, ewMargin,
+       degSeuil1, degRemise1, degSeuil2, degRemise2, degSeuil3, degRemise3,
+       annDifficulty, annRate, annCloud,
        annPadding, annBufferM, annClusterM, annConsolKm, projPerYr],
       scheduleSavePricing
     );
@@ -2053,6 +2120,7 @@ createApp({
       pwModal, pwInputRef, openSettings, submitPassword,
       // Settings
       sub, shpBase, shpScale, shpWH, shpMaxH, shpMaxML, shpProg, initRate, priceFloor, ewMargin,
+      degSeuil1, degRemise1, degSeuil2, degRemise2, degSeuil3, degRemise3,
       // Annual params
       annDifficulty, annRate, annCloud, annPadding, annBufferM, annClusterM, annConsolKm,
       // Standard params

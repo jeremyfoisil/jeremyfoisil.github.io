@@ -581,13 +581,18 @@ footer{text-align:center;padding:16px;font-size:11px;color:var(--gray-600);margi
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
                   <div class="mc hl">
                     <div class="mc-label">Total annuel HT</div>
-                    <div class="mc-val">{{ fmt(curYearRow.totalHT) }}</div>
+                    <div class="mc-val">{{ fmt(evalTotalHT) }}</div>
                     <div class="mc-sub">{{ curYearRow.total }} projet{{ curYearRow.total > 1 ? 's' : '' }} cumulés · {{ shpYear }}</div>
                   </div>
-                  <div class="mc">
+                  <div class="mc" v-if="hasRealPlei">
                     <div class="mc-label">AOIs optimisés</div>
                     <div class="mc-val">{{ annTotalAOIsYear }} AOI{{ annTotalAOIsYear > 1 ? 's' : '' }}</div>
                     <div class="mc-sub">{{ annConsolidationYear.totalArea.toLocaleString('fr-FR', {maximumFractionDigits:2}) }} km² consolidés</div>
+                  </div>
+                  <div class="mc" v-else>
+                    <div class="mc-label">Pléiades</div>
+                    <div class="mc-val" style="font-size:14px;color:var(--blue)">Estimée</div>
+                    <div class="mc-sub">Pas de géométries pour {{ shpYear }}</div>
                   </div>
                 </div>
                 <div class="brow">
@@ -604,44 +609,60 @@ footer{text-align:center;padding:16px;font-size:11px;color:var(--gray-600);margi
                   <span class="blabel">Monitoring — en suivi (−50 %)<small v-if="curYearRow.exCount"> — {{ curYearRow.exCount }} projet{{ curYearRow.exCount > 1 ? 's' : '' }}</small></span>
                   <span class="bamount">{{ fmt(curYearRow.suiviCost) }}</span>
                 </div>
-                <div class="brow" style="border-top:1px solid var(--gray-200);padding-top:8px;margin-top:4px">
-                  <span class="blabel" style="color:var(--blue)">Acquisition Pléiades<small> — {{ annPricing.pleiArea.toLocaleString('fr-FR', {maximumFractionDigits:2}) }} km² × {{ annEffRate }} €/km²</small></span>
-                  <span class="bamount" style="color:var(--blue)">{{ fmt(annPricing.pleiCost) }}</span>
-                </div>
-                <div style="background:var(--blue-pale);border:1px solid #bbdefb;border-radius:var(--r-sm);padding:10px 12px;margin:4px 0 8px;font-size:12px">
-                  <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-                    <span style="color:var(--gray-600)">Acquisitions séparées :</span>
-                    <span v-html="fmtKm2Compare(annPricing.rawAreaInd, annPricing.pleiAreaInd)"></span>
+
+                <!-- Pléiades : coût réel (géométries disponibles) -->
+                <template v-if="hasRealPlei">
+                  <div class="brow" style="border-top:1px solid var(--gray-200);padding-top:8px;margin-top:4px">
+                    <span class="blabel" style="color:var(--blue)">Acquisition Pléiades<small> — {{ annPricing.pleiArea.toLocaleString('fr-FR', {maximumFractionDigits:2}) }} km² × {{ annEffRate }} €/km²</small></span>
+                    <span class="bamount" style="color:var(--blue)">{{ fmt(annPricing.pleiCost) }}</span>
                   </div>
-                  <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-                    <span style="color:var(--gray-600)">Après mutualisation :</span>
-                    <span style="font-weight:600" v-html="fmtKm2Compare(annPricing.rawAreaCons, annPricing.pleiAreaCons)"></span>
+                  <div style="background:var(--blue-pale);border:1px solid #bbdefb;border-radius:var(--r-sm);padding:10px 12px;margin:4px 0 8px;font-size:12px">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+                      <span style="color:var(--gray-600)">Acquisitions séparées :</span>
+                      <span v-html="fmtKm2Compare(annPricing.rawAreaInd, annPricing.pleiAreaInd)"></span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+                      <span style="color:var(--gray-600)">Après mutualisation :</span>
+                      <span style="font-weight:600" v-html="fmtKm2Compare(annPricing.rawAreaCons, annPricing.pleiAreaCons)"></span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;border-top:1px solid #bbdefb;padding-top:4px;margin-top:2px">
+                      <span style="color:var(--blue);font-weight:600">Économie mutualisation :</span>
+                      <span style="font-weight:700" :style="{color: annPricing.savings > 1 ? 'var(--green)' : 'var(--gray-600)'}">
+                        {{ annPricing.savings > 1 ? '−' + fmt(annPricing.savings) + ' (' + Math.round(annPricing.savings / annPricing.pleiCostInd * 100) + ' %)' : 'Pas de surface mutualisable' }}
+                      </span>
+                    </div>
+                    <div v-if="annPricing.minApplies" style="margin-top:7px;padding:5px 8px;background:#e8f5e9;border:1px solid #c8e6c9;border-radius:var(--r-sm);font-size:11px;color:var(--green);line-height:1.4">
+                      ⚠ Surface brute inférieure à 100 km² — tarif calculé sur le minimum de commande (100 km²)
+                    </div>
                   </div>
-                  <div style="display:flex;justify-content:space-between;border-top:1px solid #bbdefb;padding-top:4px;margin-top:2px">
-                    <span style="color:var(--blue);font-weight:600">Économie mutualisation :</span>
-                    <span style="font-weight:700" :style="{color: annPricing.savings > 1 ? 'var(--green)' : 'var(--gray-600)'}">
-                      {{ annPricing.savings > 1 ? '−' + fmt(annPricing.savings) + ' (' + Math.round(annPricing.savings / annPricing.pleiCostInd * 100) + ' %)' : 'Pas de surface mutualisable' }}
-                    </span>
+                </template>
+
+                <!-- Pléiades : coût estimé (pas de géométries) -->
+                <template v-else>
+                  <div class="brow" style="border-top:1px solid var(--gray-200);padding-top:8px;margin-top:4px">
+                    <span class="blabel" style="color:var(--blue)">Acquisition Pléiades <small style="color:var(--gray-500);font-style:italic">(estimée)</small></span>
+                    <span class="bamount" style="color:var(--blue)">{{ evalPleiCost > 0 ? fmt(evalPleiCost) : '—' }}</span>
                   </div>
-                  <div v-if="annPricing.minApplies" style="margin-top:7px;padding:5px 8px;background:#e8f5e9;border:1px solid #c8e6c9;border-radius:var(--r-sm);font-size:11px;color:var(--green);line-height:1.4">
-                    ⚠ Surface brute inférieure à 100 km² — tarif calculé sur le minimum de commande (100 km²)
+                  <div v-if="evalPleiCost > 0" style="background:#e3f2fd;border:1px solid #bbdefb;border-radius:var(--r-sm);padding:8px 10px;margin:4px 0 8px;font-size:11px;color:var(--blue);line-height:1.4;font-style:italic">
+                    Estimation basée sur le nombre de projets actifs — chargez des géométries pour un calcul précis.
                   </div>
-                </div>
+                </template>
+
                 <div class="brow total">
                   <span class="blabel">Total HT</span>
-                  <span class="bamount">{{ fmt(curYearRow.totalHT) }}</span>
+                  <span class="bamount">{{ fmt(evalTotalHT) }}</span>
                 </div>
                 <div class="brow sub-line">
                   <span class="blabel">TVA 20 %</span>
-                  <span class="bamount">{{ fmt(curYearRow.totalHT * 0.2) }}</span>
+                  <span class="bamount">{{ fmt(evalTotalHT * 0.2) }}</span>
                 </div>
                 <div class="brow sub-line" style="padding-bottom:10px">
                   <span class="blabel" style="font-size:13px;font-weight:600;color:var(--gray-800)">Total TTC</span>
-                  <span class="bamount" style="font-size:15px">{{ fmt(curYearRow.totalHT * 1.2) }}</span>
+                  <span class="bamount" style="font-size:15px">{{ fmt(evalTotalHT * 1.2) }}</span>
                 </div>
                 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray-600);margin:14px 0 6px">Structure du coût global</div>
                 <div class="chart-wrap" style="height:160px"><canvas id="ann-donut-chart"></canvas></div>
-                <div v-if="annHasAreaYear">
+                <div v-if="hasRealPlei && annHasAreaYear">
                   <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray-600);margin:16px 0 6px">Surface imagée par projet (km²)</div>
                   <div class="chart-wrap" :style="{height: Math.max(60, shpProjects.length * 32) + 'px'}"><canvas id="ann-bar-area"></canvas></div>
                   <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray-600);margin:16px 0 6px">Coût Pléiades par projet (€)</div>
@@ -1603,6 +1624,15 @@ createApp({
       newCount:0, exCount:0, total:0, initCost:0, suiviCost:0, pleiCost:0, totalHT:0
     });
 
+    // Pléiades : géométries réelles disponibles → coût réel, sinon coût projeté (estimé)
+    const hasRealPlei = computed(() => suiviMode.value === 'annuel' && annYearProjects.value.length > 0);
+    const evalPleiCost = computed(() => hasRealPlei.value ? annPricing.value.pleiCost : curYearRow.value.pleiCost);
+    const evalTotalHT = computed(() => {
+      if (suiviMode.value !== 'annuel') return curYearRow.value.totalHT;
+      // Remplace le pleiCost estimé par le réel si on a des géométries
+      return curYearRow.value.totalHT - curYearRow.value.pleiCost + evalPleiCost.value;
+    });
+
     // ── Project card status helpers (driven by shpYear) ───────────────────────
     function projStatusLabel(p) {
       if(p.annee===shpYear.value) return 'Initialisation';
@@ -2164,7 +2194,7 @@ createApp({
       shpInitCost, shpSuiviCost, shpTotalHT,
       yearNewOnes, yearSuiviOnes, yearVisibleProjects,
       shpInitCostYear, shpSuiviCostYear, shpTotalHTYear,
-      projectionRows, curYearRow,
+      projectionRows, curYearRow, hasRealPlei, evalPleiCost, evalTotalHT,
       annProjectAOIs, annConsolidation, annTotalAOIs, annHasArea, annPricing,
       annYearProjects, annProjectAOIsYear, annConsolidationYear, annTotalAOIsYear, annHasAreaYear,
       // Methods

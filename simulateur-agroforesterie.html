@@ -418,15 +418,10 @@ footer{text-align:center;padding:16px;font-size:11px;color:var(--gray-600);margi
             <span>{{ fmtLen(shpTotalLen) }} de haies</span>
           </div>
 
-          <!-- Projection slider -->
-          <div class="sec-div" style="margin-top:16px">Projection — nouveaux projets / an</div>
-          <div class="fgroup">
-            <div class="flabel"><span>Nouveaux projets / an</span><span class="fval">{{ projPerYr }}</span></div>
-            <input type="range" min="0" max="30" step="1" v-model.number="projPerYr">
-            <div class="irow"><input type="number" min="0" max="30" v-model.number="projPerYr" style="width:65px"><span>projets/an (forecasters)</span></div>
-          </div>
-          <div style="font-size:11px;color:var(--gray-600);background:var(--gray-100);border-radius:var(--r-sm);padding:8px 10px;margin-top:4px;line-height:1.5">
-            Initialisés en N → premiers suivis en N+3 · coût moyen des projets actuels appliqué aux forecasters.
+          <!-- Info projection -->
+          <div style="font-size:11px;color:var(--gray-600);background:var(--gray-100);border-radius:var(--r-sm);padding:8px 10px;margin-top:16px;line-height:1.5">
+            Éditez le nombre de nouveaux projets par année directement dans le tableau de projections (onglet <em>Projections</em>).
+            Initialisés en N → premiers suivis en N+3 · coût moyen des projets actuels appliqué aux projections.
           </div>
         </div>
 
@@ -658,7 +653,7 @@ footer{text-align:center;padding:16px;font-size:11px;color:var(--gray-600);margi
           <!-- ── Projections sub-tab ── -->
           <div v-show="evalSubTab==='projections'">
             <p style="font-size:12px;color:var(--gray-600);margin-bottom:14px">
-              Projections 2020 → 2050 — <strong>{{ projPerYr }} nouveau{{ projPerYr > 1 ? 'x' : '' }} projet{{ projPerYr > 1 ? 's' : '' }}</strong> s'ajoutent chaque année à partir de {{ shpYear + 1 }}.
+              Projections 2020 → 2050 — éditez le nombre de <strong>nouveaux projets</strong> par année dans la colonne dédiée.
               <span v-if="suiviMode==='triennal'">Projets initialisés en N → premiers suivis en N+3.</span>
               <span v-else style="color:var(--blue)">Suivi annuel : tous les projets antérieurs sont imagés chaque année — coût Pléiades estimé d'après l'année de référence.</span>
               <span style="margin-left:6px;color:var(--gray-600)">· Ligne <span style="background:var(--green-pale);padding:1px 5px;border-radius:4px;font-weight:700;color:var(--green)">verte</span> = année sélectionnée · <span style="color:var(--blue)">Bleu</span> = années futures</span>
@@ -678,7 +673,18 @@ footer{text-align:center;padding:16px;font-size:11px;color:var(--gray-600);margi
                       :class="{'proj-row-selected': row.isSelected, 'proj-row-future': row.isFuture && !row.isSelected}">
                     <td><strong>{{ row.year }}</strong> <span v-if="row.isSelected" class="pill">Sélectionnée</span></td>
                     <td class="hl">{{ row.total }}</td>
-                    <td>{{ row.newCount }}</td>
+                    <td>
+                      <span v-if="row.realNewCount">{{ row.realNewCount }}</span>
+                      <template v-if="row.isFuture">
+                        <span v-if="row.realNewCount" style="color:var(--gray-400);margin:0 2px">+</span>
+                        <input type="number" min="0" max="99" step="1"
+                               :value="getProjPerYear(row.year)"
+                               @input="setProjPerYear(row.year, $event.target.value)"
+                               style="width:46px;padding:2px 4px;font-size:12px;border:1px solid var(--gray-300);border-radius:4px;text-align:center"
+                               title="Nouveaux projets projetés">
+                      </template>
+                      <span v-else-if="!row.realNewCount">{{ row.newCount }}</span>
+                    </td>
                     <td>{{ row.exCount }}</td>
                     <td class="amt" :style="{color: row.newCount === 0 && row.exCount === 0 ? 'var(--gray-200)' : ''}">
                       {{ row.newCount === 0 && row.exCount === 0 ? '—' : fmt(sub) }}
@@ -994,8 +1000,15 @@ createApp({
     const annClusterM   = ref(500);
     const annConsolKm   = ref(5);
 
-    // ── Standard tab params ───────────────────────────────────────────────────
-    const projPerYr      = ref(0);
+    // ── Projection : nouveaux projets par année (year→count) ────────────────
+    const projPerYear = reactive({});          // ex: {2027: 2, 2028: 5, ...}
+    function getProjPerYear(y) { return projPerYear[y] || 0; }
+    let _projSaveTimer = null;
+    function setProjPerYear(y, v) {
+      projPerYear[y] = Math.max(0, parseInt(v) || 0);
+      clearTimeout(_projSaveTimer);
+      _projSaveTimer = setTimeout(() => savePricingToDB(), 800);
+    }
 
     // ── Year options ──────────────────────────────────────────────────────────
     const curYear    = new Date().getFullYear();
@@ -1137,7 +1150,8 @@ createApp({
       for (const year of ALL_YEARS) {
         // Les forecasts s'accumulent à partir de shpYear+1
         if (year > startYear) {
-          for (let j = 0; j < projPerYr.value; j++) {
+          const nNew = getProjPerYear(year);
+          for (let j = 0; j < nNew; j++) {
             forecasts.push({ annee: year, price: avgPrice });
           }
         }
@@ -1159,7 +1173,9 @@ createApp({
                         + fInit.reduce((s, p) => s + p.price, 0)) * ewMult.value * degMult(total);
         const suiviCost = realSuivi.reduce((s, p) => s + computeShpPrice(p.haiesCount, p.totalLengthM, pp.value) * 0.5, 0)
                         + fSuivi.reduce((s, p) => s + p.price * 0.5, 0);
-        const newCount = realInit.length + fInit.length;
+        const realNewCount = realInit.length;
+        const forecastNew  = fInit.length;
+        const newCount = realNewCount + forecastNew;
         const exCount  = realSuivi.length + fSuivi.length;
         const hasActivity = newCount > 0 || exCount > 0;
 
@@ -1170,7 +1186,7 @@ createApp({
         const totalHT  = (hasActivity ? sub.value : 0) + initCost + suiviCost + pleiCost;
 
         rows.push({
-          year, total, newCount, exCount,
+          year, total, newCount, realNewCount, forecastNew, exCount,
           initCost, suiviCost, pleiCost, totalHT,
           tva: totalHT * 0.2, ttc: totalHT * 1.2,
           isSelected: year === startYear,
@@ -2053,7 +2069,10 @@ createApp({
       annBufferM.value  = data.ann_buffer_m;
       annClusterM.value = data.ann_cluster_m;
       annConsolKm.value = data.ann_consol_km;
-      projPerYr.value   = data.proj_per_yr;
+      if (data.proj_per_year) {
+        Object.keys(projPerYear).forEach(k => delete projPerYear[k]);
+        Object.entries(data.proj_per_year).forEach(([y, n]) => { projPerYear[parseInt(y)] = n; });
+      }
       if (data.deg_seuil1  != null) degSeuil1.value  = data.deg_seuil1;
       if (data.deg_remise1 != null) degRemise1.value = data.deg_remise1;
       if (data.deg_seuil2  != null) degSeuil2.value  = data.deg_seuil2;
@@ -2082,7 +2101,7 @@ createApp({
         ann_buffer_m:  annBufferM.value,
         ann_cluster_m: annClusterM.value,
         ann_consol_km: annConsolKm.value,
-        proj_per_yr:   projPerYr.value,
+        proj_per_year: JSON.parse(JSON.stringify(projPerYear)),
         deg_seuil1:    degSeuil1.value,
         deg_remise1:   degRemise1.value,
         deg_seuil2:    degSeuil2.value,
@@ -2099,13 +2118,12 @@ createApp({
       clearTimeout(_savePricingTimer);
       _savePricingTimer = setTimeout(savePricingToDB, 800);
     }
-
     watch(
       [sub, shpBase, shpScale, shpWH, shpMaxH, shpMaxML, shpProg,
        initRate, priceFloor, ewMargin,
        degSeuil1, degRemise1, degSeuil2, degRemise2, degSeuil3, degRemise3,
        annDifficulty, annRate, annCloud,
-       annPadding, annBufferM, annClusterM, annConsolKm, projPerYr],
+       annPadding, annBufferM, annClusterM, annConsolKm],
       scheduleSavePricing
     );
 
@@ -2123,8 +2141,8 @@ createApp({
       degSeuil1, degRemise1, degSeuil2, degRemise2, degSeuil3, degRemise3,
       // Annual params
       annDifficulty, annRate, annCloud, annPadding, annBufferM, annClusterM, annConsolKm,
-      // Standard params
-      projPerYr,
+      // Projection per year
+      projPerYear, getProjPerYear, setProjPerYear,
       // Year options
       visibleYears, timelineOffset, timelineMaxOffset, shpYear, currentDate,
       timelineScrollLeft, timelineScrollRight, timelineJumpLeft, timelineJumpRight,

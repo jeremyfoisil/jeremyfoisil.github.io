@@ -2129,7 +2129,7 @@ createApp({
 
     // ── Init ──────────────────────────────────────────────────────────────────
     onMounted(()=>{
-      setTimeout(()=>{ initShpMap(); loadProjectsFromDB(); loadPricingFromDB(); }, 120);
+      setTimeout(()=>{ initShpMap(); initAnnMap(); loadProjectsFromDB(); loadPricingFromDB(); }, 120);
     });
 
     return {

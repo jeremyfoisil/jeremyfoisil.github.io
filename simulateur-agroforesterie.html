@@ -1676,9 +1676,12 @@ createApp({
 
     function projYearCostText(p) {
       const price=computeShpPrice(p.haiesCount,p.totalLengthM,pp.value);
-      const dm=degMult(yearVisibleProjects.value.length);
+      const dm=degMult(curYearRow.value.total);
       if(p.annee===shpYear.value) return fmt(price*ewMult.value*dm);
-      if(p.annee<shpYear.value) return isSuiviYear(p,shpYear.value) ? fmt(price*0.5) : '—';
+      if(p.annee<shpYear.value) {
+        const isInSuivi = suiviMode.value === 'annuel' ? true : isSuiviYear(p, shpYear.value);
+        return isInSuivi ? fmt(price*0.5) : '—';
+      }
       return fmt(price*ewMult.value*dm);
     }
 

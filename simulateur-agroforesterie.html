@@ -1150,12 +1150,10 @@ createApp({
       const rows = [];
 
       for (const year of ALL_YEARS) {
-        // Les forecasts s'accumulent à partir de shpYear+1
-        if (year > startYear) {
-          const nNew = getProjPerYear(year);
-          for (let j = 0; j < nNew; j++) {
-            forecasts.push({ annee: year, price: avgPrice });
-          }
+        // Les forecasts s'accumulent pour toute année ayant des projets projetés
+        const nNew = getProjPerYear(year);
+        for (let j = 0; j < nNew; j++) {
+          forecasts.push({ annee: year, price: avgPrice });
         }
 
         const realInit  = shpProjects.value.filter(p => p.annee === year);

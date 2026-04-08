@@ -714,7 +714,10 @@ footer{text-align:center;padding:16px;font-size:11px;color:var(--gray-600);margi
                     </td>
                     <td class="amt">{{ row.initCost > 0 ? fmt(row.initCost) : '—' }}</td>
                     <td class="amt">{{ row.suiviCost > 0 ? fmt(row.suiviCost) : '—' }}</td>
-                    <td v-if="suiviMode==='annuel'" class="amt" style="color:var(--blue)">{{ row.pleiCost > 0 ? fmt(row.pleiCost) : '—' }}</td>
+                    <td v-if="suiviMode==='annuel'" class="amt" style="color:var(--blue)">
+                      <template v-if="row.pleiCost > 0">{{ fmt(row.pleiCost) }}<small v-if="!row.pleiIsReal" style="color:var(--gray-400);font-style:italic;margin-left:3px">est.</small></template>
+                      <template v-else>—</template>
+                    </td>
                     <td class="amt hl" style="font-size:14px">{{ row.totalHT > 0 ? fmt(row.totalHT) : '—' }}</td>
                   </tr>
                 </tbody>
@@ -1156,6 +1159,23 @@ createApp({
       return (hasActivity ? sub.value : 0) + shpInitCostYear.value + shpSuiviCostYear.value;
     });
 
+    // Calcule le coût Pléiades réel à partir des géométries d'une liste de projets
+    function computeRealPleiCostForProjects(projects) {
+      if (!projects.length) return null; // pas de géométries → null = utiliser estimation
+      const MIN_KM2 = 100;
+      const rate = annEffRate.value, pad = annPadding.value;
+      const aois = projects.map(proj => ({
+        projectId: proj.id, projectName: proj.name, color: proj.color,
+        aois: calcOptimizedProjectAOIs(proj, annBufferM.value, annClusterM.value)
+      }));
+      // Vérifier qu'on a au moins une AOI avec surface
+      if (!aois.some(p => p.aois.length > 0)) return null;
+      const consol = consolidateAOIs(aois, annConsolKm.value);
+      const rawArea = consol.totalArea * pad;
+      const pleiArea = Math.max(rawArea, MIN_KM2);
+      return pleiArea * rate;
+    }
+
     // ── Projection 2020→2050 ──────────────────────────────────────────────────
     const projectionRows = computed(() => {
       const startYear = shpYear.value;
@@ -1203,14 +1223,20 @@ createApp({
         const hasActivity = newCount > 0 || exCount > 0;
 
         const activeCount = newCount + exCount;
-        const pleiCost = isAnnuel && hasActivity
+        const realActiveProjects = [...realInit, ...realSuivi];
+        const realPlei = isAnnuel && realActiveProjects.length > 0
+          ? computeRealPleiCostForProjects(realActiveProjects)
+          : null;
+        const pleiEstimated = isAnnuel && hasActivity
           ? Math.min(PLEI_MAX, Math.max(PLEI_MIN, PLEI_MIN + (activeCount - 1) * (PLEI_MAX - PLEI_MIN) / (PLEI_SCALE - 1)))
           : 0;
+        const pleiIsReal = realPlei !== null;
+        const pleiCost = pleiIsReal ? realPlei : pleiEstimated;
         const totalHT  = (hasActivity ? sub.value : 0) + initCost + suiviCost + pleiCost;
 
         rows.push({
           year, total, newCount, realNewCount, forecastNew, exCount,
-          initCost, suiviCost, pleiCost, totalHT,
+          initCost, suiviCost, pleiCost, pleiIsReal, totalHT,
           tva: totalHT * 0.2, ttc: totalHT * 1.2,
           isSelected: year === startYear,
           isFuture:   year > startYear
@@ -1624,14 +1650,10 @@ createApp({
       newCount:0, exCount:0, total:0, initCost:0, suiviCost:0, pleiCost:0, totalHT:0
     });
 
-    // Pléiades : géométries réelles disponibles → coût réel, sinon coût projeté (estimé)
-    const hasRealPlei = computed(() => suiviMode.value === 'annuel' && annYearProjects.value.length > 0);
-    const evalPleiCost = computed(() => hasRealPlei.value ? annPricing.value.pleiCost : curYearRow.value.pleiCost);
-    const evalTotalHT = computed(() => {
-      if (suiviMode.value !== 'annuel') return curYearRow.value.totalHT;
-      // Remplace le pleiCost estimé par le réel si on a des géométries
-      return curYearRow.value.totalHT - curYearRow.value.pleiCost + evalPleiCost.value;
-    });
+    // Pléiades : géométries réelles disponibles pour l'année sélectionnée ?
+    const hasRealPlei = computed(() => curYearRow.value.pleiIsReal === true);
+    const evalPleiCost = computed(() => curYearRow.value.pleiCost);
+    const evalTotalHT = computed(() => curYearRow.value.totalHT);
 
     // ── Project card status helpers (driven by shpYear) ───────────────────────
     function projStatusLabel(p) {

@@ -1588,14 +1588,14 @@ createApp({
       return 'future';
     }
 
-    // ── Year timeline helpers ──────────────────────────────────────────────────
-    function yearInitCountFor(y) {
-      return shpProjects.value.filter(p => p.annee === y).length;
-    }
-    function yearSuiviCountFor(y) {
-      if (suiviMode.value === 'annuel') return shpProjects.value.filter(p => p.annee < y).length;
-      return shpProjects.value.filter(p => isSuiviYear(p, y)).length;
-    }
+    // ── Year timeline helpers (piochent dans projectionRows) ────────────────
+    const projRowsByYear = computed(() => {
+      const m = {};
+      for (const r of projectionRows.value) m[r.year] = r;
+      return m;
+    });
+    function yearInitCountFor(y)  { return projRowsByYear.value[y]?.newCount || 0; }
+    function yearSuiviCountFor(y) { return projRowsByYear.value[y]?.exCount  || 0; }
 
     // ── Project card status helpers (driven by shpYear) ───────────────────────
     function projStatusLabel(p) {

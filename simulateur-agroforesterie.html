@@ -1593,6 +1593,7 @@ createApp({
       return shpProjects.value.filter(p => p.annee === y).length;
     }
     function yearSuiviCountFor(y) {
+      if (suiviMode.value === 'annuel') return shpProjects.value.filter(p => p.annee < y).length;
       return shpProjects.value.filter(p => isSuiviYear(p, y)).length;
     }
 
